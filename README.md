@@ -16,12 +16,13 @@ jogadores entram pelo **celular** e jogam na mesma sala em tempo real (SignalR).
 5. Quem achar que combinou com alguém aperta **CONTATO** e digita a resposta (`FACA`).
    A resposta **precisa começar com as letras já reveladas** — com `F` revelado vale
    qualquer palavra com F; com `FAR` revelado, só `FARRA`, `FARTA`, etc. (acento e
-   maiúscula são ignorados). Nesse momento o **interceptador congela** (não chuta mais)
-   e abre uma janela de **3 segundos** para todos travarem a resposta **às cegas**.
+   maiúscula são ignorados). Nesse momento abre uma janela de **3 segundos** para todos
+   travarem a resposta **às cegas** — e o interceptador tem direito a **mais 1 chute**
+   (a última chance de bloquear), além dos que já tinha queimado.
 6. No fim da janela:
    - Se **2 ou mais jogadores** digitaram a **mesma palavra**:
-     - Se essa palavra **estava queimada** pelo interceptador → **BLOQUEADO**, nenhuma
-       letra revelada e o interceptador ganha ponto.
+     - Se essa palavra **estava queimada** pelo interceptador (nos chutes livres **ou**
+       no chute final) → **BLOQUEADO**, nenhuma letra revelada e o interceptador ganha ponto.
      - Senão → **contato!** revela mais uma letra (`FA _ _ _ _`).
    - Se ninguém bateu, nada acontece.
 7. Se os jogadores revelarem a **palavra inteira**, eles **vencem a rodada** (+2 pontos

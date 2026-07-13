@@ -69,7 +69,11 @@ function renderState(s) {
   const iAmInterceptor = me && me.id === s.interceptadorId;
 
   // som + vibração ao abrir a janela de contato (só na transição)
-  if (s.phase === "ContactWindow" && prevPhase !== "ContactWindow") contactAlert();
+  if (s.phase === "ContactWindow" && prevPhase !== "ContactWindow") {
+    contactAlert();
+    $("finalInput").value = "";       // campo do chute final começa vazio
+    $("finalErr").hidden = true;
+  }
   prevPhase = s.phase;
 
   // feedback de resultado (toast) quando muda
@@ -114,10 +118,15 @@ function renderInterceptor(s) {
   show("interceptView");
   $("maskInfo").textContent = `Revelado: ${maskText(s)}`;
   const cw = s.phase === "ContactWindow";
-  $("guessPanel").hidden = cw;      // congela durante o contato
+  $("guessPanel").hidden = cw;      // esconde a fase livre durante o contato
   $("frozenPanel").hidden = !cw;
   if (cw) {
     startCountdown(s.contactDeadline, "icd");
+    const used = !!s.interceptWindowGuessUsed;
+    $("finalSent").hidden = !used;
+    $("finalInput").disabled = used;
+    $("finalBtn").disabled = used;
+    $("finalInput").placeholder = curRevealed ? curRevealed + "…" : "Palpite final";
   } else {
     stopCountdown();
     renderBurned($("burnedMine"), s.interceptGuesses, false);
@@ -276,5 +285,19 @@ $("interceptInput").addEventListener("keydown", e => { if (e.key === "Enter") $(
 $("interceptInput").addEventListener("input", () => { $("interceptErr").hidden = true; });
 
 $("clearBtn").addEventListener("click", () => connection.invoke("ClearInterceptGuesses", roomCode));
+
+// chute único do interceptador durante a janela de contato
+$("finalBtn").addEventListener("click", () => {
+  const w = $("finalInput").value.trim();
+  if (!w) return;
+  if (curPrefix && !norm(w).startsWith(curPrefix)) {
+    showFieldErr("finalErr", `O chute precisa começar com "${curRevealed}".`);
+    return;
+  }
+  $("finalErr").hidden = true;
+  connection.invoke("SubmitIntercept", roomCode, w);
+});
+$("finalInput").addEventListener("keydown", e => { if (e.key === "Enter") $("finalBtn").click(); });
+$("finalInput").addEventListener("input", () => { $("finalErr").hidden = true; });
 
 start().catch(err => { $("foot").textContent = "Erro: " + err; console.error(err); });

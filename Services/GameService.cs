@@ -88,6 +88,7 @@ public class GameService
             room.Submissions.Clear();
             room.InterceptGuesses.Clear();
             room.LastInterceptGuessUtc = null;
+            room.InterceptWindowGuessUsed = false;
             room.LastResult = null;
             room.LastResultWord = null;
             room.ContactDeadlineUtc = null;
@@ -139,9 +140,10 @@ public class GameService
             if (room.Phase == GamePhase.Playing)
             {
                 // primeiro a apertar abre a janela
-                room.Phase = GamePhase.ContactWindow;   // interceptador congela aqui
+                room.Phase = GamePhase.ContactWindow;   // interceptador ganha 1 chute extra aqui
                 room.ContactToken = token = Guid.NewGuid();
                 room.ContactDeadlineUtc = DateTime.UtcNow.AddSeconds(ContactWindowSeconds);
+                room.InterceptWindowGuessUsed = false;
                 room.LastResult = null;
                 room.LastResultWord = null;
                 openedWindow = true;
@@ -162,26 +164,40 @@ public class GameService
 
         lock (room.Sync)
         {
-            // só na fase livre — depois que alguém aperta CONTATO ele congela
-            if (room.Phase != GamePhase.Playing) return;
             if (room.InterceptadorId != connectionId) return;
 
-            // cooldown anti-spam
+            var freePhase = room.Phase == GamePhase.Playing;      // chutes livres (com cooldown)
+            var window = room.Phase == GamePhase.ContactWindow;   // 1 chute extra durante o contato
+            if (!freePhase && !window) return;
+            if (window && room.InterceptWindowGuessUsed) return;  // já usou o chute único da janela
+
+            // cooldown só na fase livre
             var now = DateTime.UtcNow;
-            if (room.LastInterceptGuessUtc.HasValue &&
+            if (freePhase && room.LastInterceptGuessUtc.HasValue &&
                 (now - room.LastInterceptGuessUtc.Value).TotalMilliseconds < InterceptCooldownMs)
                 return;
 
             var clean = (word ?? "").Trim().ToUpperInvariant();
-            if (Room.Normalize(clean).Length == 0) return;
+            var n = Room.Normalize(clean);
+            if (n.Length == 0) return;
             // o chute também precisa começar com o prefixo revelado
-            if (!Room.Normalize(clean).StartsWith(RevealedPrefix(room), StringComparison.Ordinal)) return;
-            // ignora repetidos
-            if (room.InterceptGuesses.Any(g => Room.Normalize(g) == Room.Normalize(clean))) return;
+            if (!n.StartsWith(RevealedPrefix(room), StringComparison.Ordinal)) return;
 
-            room.InterceptGuesses.Add(clean);
-            room.LastInterceptGuessUtc = now;
-            added = true;
+            var isDup = room.InterceptGuesses.Any(g => Room.Normalize(g) == n);
+
+            if (window)
+            {
+                room.InterceptWindowGuessUsed = true;   // consome o chute único do contato
+                if (!isDup) room.InterceptGuesses.Add(clean);
+                added = true;
+            }
+            else // fase livre
+            {
+                if (isDup) return;                       // ignora repetidos
+                room.InterceptGuesses.Add(clean);
+                room.LastInterceptGuessUtc = now;
+                added = true;
+            }
         }
 
         if (added) await BroadcastStateAsync(room);
@@ -259,6 +275,7 @@ public class GameService
             room.Submissions.Clear();
             room.InterceptGuesses.Clear();
             room.LastInterceptGuessUtc = null;
+            room.InterceptWindowGuessUsed = false;
 
             if (room.LastResult == "success" && room.RevealedCount >= room.WordLength)
             {
@@ -328,6 +345,7 @@ public class GameService
                     : (long?)null,
                 submittedPlayerIds = room.Submissions.Keys.ToList(),
                 interceptGuesses = room.InterceptGuesses.ToList(),
+                interceptWindowGuessUsed = room.InterceptWindowGuessUsed,
                 lastResult = room.LastResult,
                 lastResultWord = room.LastResultWord,
             };

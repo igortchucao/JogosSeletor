@@ -63,10 +63,15 @@
         <button id="clearBtn" class="btn small ghost" hidden>Limpar chutes</button>
       </div>
 
-      <!-- congelado durante o contato -->
+      <!-- contato feito: 1 último chute pra bloquear -->
       <div id="frozenPanel" class="panel frozen" hidden>
-        <p class="strong">🧊 Congelado! Os jogadores estão travando a resposta…</p>
+        <p class="strong">⚡ CONTATO! Última chance de bloquear</p>
         <p class="big-count"><b id="icd">--</b>s</p>
+        <p class="muted">Você pode chutar mais <b>1 palavra</b>:</p>
+        <input id="finalInput" autocapitalize="characters" autocomplete="off" placeholder="Palpite final" />
+        <button id="finalBtn" class="btn danger big">Bloquear! 🎯</button>
+        <p id="finalErr" class="err" hidden></p>
+        <p id="finalSent" class="ok" hidden>Chute final enviado ✔</p>
       </div>
     </section>
 

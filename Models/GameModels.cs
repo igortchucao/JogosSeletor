@@ -41,6 +41,7 @@ public class Room
     // chutes do interceptador na fase livre ("palavras queimadas"), em MAIÚSCULAS
     public List<string> InterceptGuesses { get; } = new();
     public DateTime? LastInterceptGuessUtc { get; set; }
+    public bool InterceptWindowGuessUsed { get; set; } // já usou o chute único da janela de contato
 
     // --- último resultado (para animação/feedback) ---
     public string? LastResult { get; set; }      // "success" | "blocked" | "failed"
