@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Contato — Jogar</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="phone">
+  <header class="topbar">
+    <h1 class="logo small">CONTA<span>TO</span></h1>
+    <div class="room-pill" id="roomPill" hidden>Sala <strong id="roomCode">----</strong></div>
+  </header>
+
+  <main id="app">
+    <!-- ENTRAR -->
+    <section id="joinView" class="view pad">
+      <h2>Entrar na sala</h2>
+      <label class="field">
+        <span>Código da sala</span>
+        <input id="codeInput" maxlength="4" autocapitalize="characters" autocomplete="off" placeholder="ABCD" />
+      </label>
+      <label class="field">
+        <span>Seu nome</span>
+        <input id="nameInput" maxlength="20" autocomplete="off" placeholder="Ex: Ana" />
+      </label>
+      <button id="joinBtn" class="btn primary big">Entrar</button>
+      <p id="joinError" class="err" hidden></p>
+    </section>
+
+    <!-- ESPERANDO -->
+    <section id="waitView" class="view pad center" hidden>
+      <div class="spinner"></div>
+      <p id="waitMsg">Aguardando o telão iniciar a rodada…</p>
+    </section>
+
+    <!-- INTERCEPTADOR: definir palavra -->
+    <section id="setWordView" class="view pad" hidden>
+      <div class="role-badge intercept">🎯 Você é o INTERCEPTADOR</div>
+      <p>Digite uma palavra secreta. Os jogadores só verão a 1ª letra.</p>
+      <label class="field">
+        <span>Palavra secreta</span>
+        <input id="secretInput" autocapitalize="characters" autocomplete="off" placeholder="Ex: FAROFA" />
+      </label>
+      <button id="setWordBtn" class="btn primary big">Começar rodada</button>
+    </section>
+
+    <!-- JOGO: interceptador -->
+    <section id="interceptView" class="view pad" hidden>
+      <div class="role-badge intercept">🎯 INTERCEPTADOR</div>
+      <p class="muted">Sua palavra secreta:</p>
+      <div id="secretWord" class="secret-word">—</div>
+      <div id="maskInfo" class="mask-info"></div>
+
+      <!-- fase livre: chutar as dicas -->
+      <div id="guessPanel" class="panel">
+        <p class="muted">Adivinhe as dicas dos jogadores. Cada chute aparece na tela deles e <b>queima</b> a palavra. Se eles baterem contato numa palavra que você chutou, você <b>bloqueia</b>!</p>
+        <p class="prefix-hint" id="prefixHintI"></p>
+        <input id="interceptInput" autocapitalize="characters" autocomplete="off" placeholder="Chutar palavra da dica" />
+        <button id="interceptBtn" class="btn danger big">Chutar 🔥</button>
+        <p id="interceptErr" class="err" hidden></p>
+        <div id="burnedMine" class="burned-list"></div>
+        <button id="clearBtn" class="btn small ghost" hidden>Limpar chutes</button>
+      </div>
+
+      <!-- congelado durante o contato -->
+      <div id="frozenPanel" class="panel frozen" hidden>
+        <p class="strong">🧊 Congelado! Os jogadores estão travando a resposta…</p>
+        <p class="big-count"><b id="icd">--</b>s</p>
+      </div>
+    </section>
+
+    <!-- JOGO: jogador -->
+    <section id="playerView" class="view pad" hidden>
+      <div class="role-badge player">🗣️ JOGADOR</div>
+      <div id="maskInfoP" class="mask-info big"></div>
+
+      <div id="burnedP" class="burned-box" hidden>
+        <span class="burned-label">🔥 Queimadas pelo interceptador (evite!):</span>
+        <div id="burnedPList" class="burned-list"></div>
+      </div>
+
+      <p class="muted">Combine uma dica com alguém e mande o CONTATO. A resposta precisa começar com as letras já reveladas:</p>
+      <label class="field">
+        <span>Resposta da dica <b id="prefixHintP" class="prefix-hint"></b></span>
+        <input id="guessInput" autocapitalize="characters" autocomplete="off" placeholder="Ex: FACA" />
+      </label>
+      <p id="contactErr" class="err" hidden></p>
+      <button id="contactBtn" class="btn primary huge">CONTATO!</button>
+      <div id="contactStatus" class="panel" hidden>
+        <p><b id="ccd">--</b>s — <span id="submittedCount">0</span> jogador(es) já responderam</p>
+        <p id="mySubmit" class="ok" hidden></p>
+      </div>
+    </section>
+
+    <!-- FEEDBACK -->
+    <div id="toast" class="toast" hidden></div>
+  </main>
+
+  <footer class="foot tiny" id="foot"></footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+  <script src="js/play.js"></script>
+</body>
+</html>
