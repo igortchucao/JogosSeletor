@@ -1,0 +1,21 @@
+name: keep-warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # a cada 10 min (horário UTC)
+  workflow_dispatch: {}       # permite rodar manualmente pela aba Actions
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /healthz
+        run: |
+          URL="https://contato-acmu.onrender.com/healthz"
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$URL") || code=000
+            echo "tentativa $i -> HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "servidor nao respondeu 200 (pode estar acordando)"

@@ -18,4 +18,7 @@ app.UseStaticFiles();
 
 app.MapHub<GameHub>("/gamehub");
 
+// health check leve p/ o keep-warm (evita o Render hibernar no plano free)
+app.MapGet("/healthz", () => Results.Text("ok"));
+
 app.Run();
