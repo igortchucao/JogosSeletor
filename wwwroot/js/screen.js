@@ -160,6 +160,9 @@ function renderRound(s) {
 
   // botão próxima rodada (só o telão)
   $("nextBtn").hidden = s.phase !== "RoundOver";
+  // saída de emergência: reiniciar rodada (ex: interceptador caiu)
+  const rb = $("restartBtn");
+  if (rb) rb.hidden = !(s.phase === "AwaitingWord" || s.phase === "Playing");
 }
 
 function renderWord(s) {
@@ -221,6 +224,7 @@ function escapeHtml(str) {
 
 $("startBtn").addEventListener("click", () => { ensureAudio(); connection.invoke("StartRound", roomCode); });
 $("nextBtn").addEventListener("click", () => { ensureAudio(); connection.invoke("StartRound", roomCode); });
+$("restartBtn")?.addEventListener("click", () => { ensureAudio(); connection.invoke("StartRound", roomCode); });
 
 start().catch(err => {
   $("foot").textContent = "Erro ao conectar: " + err;
