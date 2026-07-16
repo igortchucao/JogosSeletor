@@ -12,10 +12,12 @@ jobs:
       - name: Ping /healthz
         run: |
           URL="https://contato-acmu.onrender.com/healthz"
-          for i in 1 2 3; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$URL") || code=000
+          # cold start do container .NET pode levar 40-90s, entao espera de verdade
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 "$URL") || code=000
             echo "tentativa $i -> HTTP $code"
-            [ "$code" = "200" ] && exit 0
-            sleep 20
+            [ "$code" = "200" ] && echo "servidor acordado" && exit 0
+            sleep 15
           done
-          echo "servidor nao respondeu 200 (pode estar acordando)"
+          echo "::error::servidor nao respondeu 200 apos 5 tentativas"
+          exit 1   # falha de verdade: um check verde agora significa algo
