@@ -3,76 +3,62 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Contato — Telão</title>
-<link rel="stylesheet" href="css/style.css" />
+<title>Jogos — escolha um</title>
+<style>
+  :root {
+    --bg: #0b0f1a; --card: #18223b; --line: #26314f;
+    --txt: #e8ecf6; --muted: #8b96b3; --primary: #5b8cff; --gold: #ffcf4a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -10%, #1a2b52 0%, transparent 60%), var(--bg);
+    color: var(--txt); min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  h1 { font-size: 40px; letter-spacing: 2px; margin-bottom: 8px; text-align: center; }
+  .sub { color: var(--muted); margin-bottom: 36px; text-align: center; }
+  .games { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px;
+           width: 100%; max-width: 720px; }
+  .game {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    padding: 28px 24px; transition: transform .12s, border-color .12s, box-shadow .12s;
+  }
+  .game:hover { transform: translateY(-4px); border-color: var(--primary);
+                box-shadow: 0 12px 40px rgba(91,140,255,.25); }
+  .emoji { font-size: 44px; display: block; margin-bottom: 14px; }
+  .game h2 { font-size: 24px; margin-bottom: 8px; }
+  .game p { color: var(--muted); font-size: 15px; line-height: 1.5; }
+  .tag { display: inline-block; margin-top: 14px; font-size: 13px; font-weight: 700;
+         color: var(--gold); background: rgba(255,207,74,.12);
+         border: 1px solid var(--gold); border-radius: 999px; padding: 4px 12px; }
+  footer { margin-top: 40px; color: var(--muted); font-size: 13px; text-align: center; }
+</style>
 </head>
-<body class="screen">
-  <header class="topbar">
-    <h1 class="logo">CONTA<span>TO</span></h1>
-    <div class="room-pill" id="roomPill" hidden>
-      Sala <strong id="roomCode">----</strong>
-    </div>
-  </header>
+<body>
+  <h1>🎉 Jogos</h1>
+  <p class="sub">Escolha um jogo e chame a galera pelo QR code.</p>
 
-  <main id="app">
-    <!-- LOBBY -->
-    <section id="lobby" class="view">
-      <div class="lobby-grid">
-        <div class="join-card">
-          <p class="join-hint">Entre pelo celular:</p>
-          <div id="qrcode" class="qr"></div>
-          <p class="join-url" id="joinUrl">—</p>
-          <p class="join-code">ou use o código <strong id="lobbyCode">----</strong></p>
-        </div>
-        <div class="players-card">
-          <h2>Jogadores <span id="playerCount" class="count">0</span></h2>
-          <ul id="playerList" class="player-list"></ul>
-          <button id="startBtn" class="btn primary big" disabled>Iniciar rodada</button>
-          <p class="tiny">Mínimo de 3 jogadores. A cada rodada, um jogador vira o <b>interceptador</b>.</p>
-        </div>
-      </div>
-    </section>
+  <div class="games">
+    <a class="game" href="/contato/">
+      <span class="emoji">🗣️</span>
+      <h2>Contato</h2>
+      <p>Um jogador esconde uma palavra. Os outros dão dicas e tentam
+         fazer contato pra revelar letra por letra — enquanto ele tenta bloquear.</p>
+      <span class="tag">3+ jogadores</span>
+    </a>
 
-    <!-- RODADA -->
-    <section id="round" class="view" hidden>
-      <div class="round-top">
-        <div class="interceptor-tag">
-          Interceptador: <strong id="interceptorName">—</strong>
-        </div>
-        <div id="statusLine" class="status-line">—</div>
-        <button id="restartBtn" class="btn small ghost" hidden>⟳ Nova rodada</button>
-      </div>
+    <a class="game" href="/soberania/">
+      <span class="emoji">🌍</span>
+      <h2>Soberania</h2>
+      <p>Jogo geopolítico: escolha seu país, negocie recursos, faça alianças
+         e dispute a hegemonia.</p>
+      <span class="tag">Multiplayer</span>
+    </a>
+  </div>
 
-      <div class="word-wrap">
-        <div id="wordDisplay" class="word"></div>
-      </div>
-
-      <div id="burnedStrip" class="burned-strip" hidden>
-        <span class="burned-label">🔥 Queimadas pelo interceptador:</span>
-        <div id="burnedStripList" class="burned-list"></div>
-      </div>
-
-      <div id="contactBar" class="contact-bar" hidden>
-        <div class="pulse-dot"></div>
-        <span>CONTATO! Resolvendo em <strong id="countdown">--</strong>s</span>
-      </div>
-
-      <div id="resultBanner" class="result-banner" hidden></div>
-
-      <div class="round-bottom">
-        <div class="scoreboard">
-          <h3>Placar</h3>
-          <ul id="scoreList"></ul>
-        </div>
-        <button id="nextBtn" class="btn primary" hidden>Próxima rodada</button>
-      </div>
-    </section>
-  </main>
-
-  <footer class="foot tiny" id="foot"></footer>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="js/screen.js"></script>
+  <footer>Abra esta tela na TV — os jogadores entram pelo celular.</footer>
 </body>
 </html>

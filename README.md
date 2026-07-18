@@ -1,4 +1,23 @@
-# Contato — jogo de palavras multiplayer
+# Jogos — Contato + Soberania
+
+Este serviço hospeda **dois jogos** no mesmo app ASP.NET Core (um só deploy, uma só URL):
+
+| Rota | Jogo |
+|---|---|
+| `/` | menu — escolha o jogo |
+| `/contato/` | **Contato** (telão) · `/contato/play.html` (celular) · hub `/hubs/contato` |
+| `/soberania/` | **Soberania** · hub `/hubs/soberania` |
+
+Cada jogo tem seu próprio Hub, Service e Models. As classes têm o mesmo nome nos dois
+(`GameHub`, `GameService`), mas ficam em **namespaces diferentes** (`Contato.*` e
+`Soberania.*`) — por isso o `Program.cs` sempre as qualifica.
+
+> ⚠️ O código do Soberania mora **aqui** (`Soberania/` + `wwwroot/soberania/`).
+> A pasta `repos/Soberania` é a versão antiga e standalone — não edite lá.
+
+---
+
+## Contato — jogo de palavras multiplayer
 
 Versão digital do jogo "Contato". O **telão** (TV/computador) mostra um QR code; os
 jogadores entram pelo **celular** e jogam na mesma sala em tempo real (SignalR).

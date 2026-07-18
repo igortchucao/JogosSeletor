@@ -25,7 +25,7 @@ function show(view) {
 
 async function start() {
   connection = new signalR.HubConnectionBuilder()
-    .withUrl("/gamehub")
+    .withUrl("/hubs/contato")
     .withAutomaticReconnect()
     .build();
 

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contato — Telão</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="screen">
+  <header class="topbar">
+    <h1 class="logo">CONTA<span>TO</span></h1>
+    <div class="room-pill" id="roomPill" hidden>
+      Sala <strong id="roomCode">----</strong>
+    </div>
+  </header>
+
+  <main id="app">
+    <!-- LOBBY -->
+    <section id="lobby" class="view">
+      <div class="lobby-grid">
+        <div class="join-card">
+          <p class="join-hint">Entre pelo celular:</p>
+          <div id="qrcode" class="qr"></div>
+          <p class="join-url" id="joinUrl">—</p>
+          <p class="join-code">ou use o código <strong id="lobbyCode">----</strong></p>
+        </div>
+        <div class="players-card">
+          <h2>Jogadores <span id="playerCount" class="count">0</span></h2>
+          <ul id="playerList" class="player-list"></ul>
+          <button id="startBtn" class="btn primary big" disabled>Iniciar rodada</button>
+          <p class="tiny">Mínimo de 3 jogadores. A cada rodada, um jogador vira o <b>interceptador</b>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- RODADA -->
+    <section id="round" class="view" hidden>
+      <div class="round-top">
+        <div class="interceptor-tag">
+          Interceptador: <strong id="interceptorName">—</strong>
+        </div>
+        <div id="statusLine" class="status-line">—</div>
+        <button id="restartBtn" class="btn small ghost" hidden>⟳ Nova rodada</button>
+      </div>
+
+      <div class="word-wrap">
+        <div id="wordDisplay" class="word"></div>
+      </div>
+
+      <div id="burnedStrip" class="burned-strip" hidden>
+        <span class="burned-label">🔥 Queimadas pelo interceptador:</span>
+        <div id="burnedStripList" class="burned-list"></div>
+      </div>
+
+      <div id="contactBar" class="contact-bar" hidden>
+        <div class="pulse-dot"></div>
+        <span>CONTATO! Resolvendo em <strong id="countdown">--</strong>s</span>
+      </div>
+
+      <div id="resultBanner" class="result-banner" hidden></div>
+
+      <div class="round-bottom">
+        <div class="scoreboard">
+          <h3>Placar</h3>
+          <ul id="scoreList"></ul>
+        </div>
+        <button id="nextBtn" class="btn primary" hidden>Próxima rodada</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot tiny" id="foot"></footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="js/screen.js"></script>
+</body>
+</html>

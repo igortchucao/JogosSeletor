@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Soberania</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="logo">SOBERA<span>NIA</span></h1>
+    <div class="room-pill" id="roomPill" hidden>Sala <strong id="roomCode">----</strong></div>
+  </header>
+
+  <main id="app">
+    <!-- HOME: criar ou entrar -->
+    <section id="homeView" class="view pad">
+      <label class="field">
+        <span>Seu nome (líder)</span>
+        <input id="nameInput" maxlength="20" autocomplete="off" placeholder="Ex: Ana" />
+      </label>
+
+      <button id="createBtn" class="btn primary big">Criar sala</button>
+
+      <div class="or">ou entrar numa sala</div>
+
+      <label class="field">
+        <span>Código da sala</span>
+        <input id="codeInput" maxlength="4" autocapitalize="characters" autocomplete="off" placeholder="ABCD" />
+      </label>
+      <button id="joinBtn" class="btn big">Entrar</button>
+
+      <p id="homeError" class="err" hidden></p>
+    </section>
+
+    <!-- LOBBY -->
+    <section id="lobbyView" class="view pad" hidden>
+      <h2>Lobby</h2>
+      <p class="muted">Escolha seu país e seu título. Quando todos estiverem prontos, o host inicia.</p>
+
+      <div class="field">
+        <span>Seu título</span>
+        <div class="title-picker" id="titlePicker">
+          <button class="chip" data-title="Presidente">Presidente</button>
+          <button class="chip" data-title="Ditador">Ditador</button>
+          <button class="chip" data-title="Rei">Rei</button>
+        </div>
+      </div>
+
+      <h3>Países</h3>
+      <div id="countryGrid" class="country-grid"></div>
+
+      <h3>Jogadores</h3>
+      <ul id="lobbyPlayers" class="players"></ul>
+
+      <button id="startBtn" class="btn primary big" hidden>Iniciar jogo</button>
+      <p id="startHint" class="muted tiny"></p>
+    </section>
+
+    <!-- JOGO -->
+    <section id="gameView" class="view" hidden>
+      <div class="round-bar">
+        <span>Rodada <strong id="roundNum">1</strong></span>
+        <div class="phase-steps" id="phaseSteps"></div>
+      </div>
+
+      <div class="phase-panel pad">
+        <h2 id="phaseTitle">—</h2>
+        <p id="phaseDesc" class="muted"></p>
+        <div id="phasePlaceholder" class="placeholder">
+          <span class="soon">🚧 Em breve</span>
+          <p class="tiny muted" id="placeholderNote"></p>
+        </div>
+      </div>
+
+      <!-- NEGOCIAÇÃO -->
+      <div id="negPanel" class="pad" hidden>
+        <h3>Com quem negociar</h3>
+        <div id="negTargets" class="targets"></div>
+
+        <div id="tradeBuilder" class="trade-builder" hidden>
+          <div class="tb-head">Proposta para <strong id="tbTarget"></strong></div>
+          <p id="tbNpcHint" class="tiny muted" hidden></p>
+          <div class="tb-cols">
+            <div>
+              <div class="tb-label give">Você oferece</div>
+              <div id="offerInputs" class="res-inputs"></div>
+            </div>
+            <div>
+              <div class="tb-label get">Você quer receber</div>
+              <div id="requestInputs" class="res-inputs"></div>
+            </div>
+          </div>
+          <button id="sendProposalBtn" class="btn primary big">Enviar proposta</button>
+          <button id="cancelTargetBtn" class="btn small ghost">Trocar de alvo</button>
+          <p id="negMsg" class="tiny" hidden></p>
+        </div>
+
+        <h3>Propostas recebidas</h3>
+        <div id="incomingList" class="prop-list"></div>
+
+        <h3>Minhas propostas</h3>
+        <div id="outgoingList" class="prop-list"></div>
+      </div>
+
+      <!-- INVESTIMENTO -->
+      <div id="invPanel" class="pad" hidden>
+        <h3>Cartas do turno — compre as que puder pagar</h3>
+        <div id="offerCards" class="cards"></div>
+        <h3>Sua mão (<span id="handCount">0</span>) — jogadas na fase de Ações</h3>
+        <div id="handCards" class="cards"></div>
+      </div>
+
+      <!-- AÇÕES / REPRESÁLIAS -->
+      <div id="acoesPanel" class="pad" hidden>
+        <div id="acoesBanner" class="ongoing-banner" hidden></div>
+        <div id="ongoingBanner" class="ongoing-banner warn" hidden></div>
+
+        <div id="acoesTools">
+          <h3>Sua mão — jogue as cartas</h3>
+          <div id="acaoHand" class="cards"></div>
+
+          <h3>Agir contra uma nação</h3>
+          <label class="field">
+            <span>Alvo</span>
+            <select id="actTarget" class="sel-input"></select>
+          </label>
+          <div class="act-buttons">
+            <button id="btnAtacar" class="btn danger small">⚔️ Atacar militarmente</button>
+            <button id="btnDifamar" class="btn small">📢 Difamar (150 💰)</button>
+          </div>
+
+          <div id="relCreate">
+            <h4>Criar relação comercial (vale todo turno até cortar)</h4>
+            <div class="tb-cols">
+              <div><div class="tb-label give">Você dá / rodada</div><div id="relGiveInputs" class="res-inputs"></div></div>
+              <div><div class="tb-label get">Você recebe / rodada</div><div id="relGetInputs" class="res-inputs"></div></div>
+            </div>
+            <button id="btnCriarRel" class="btn primary small">Propor relação ao alvo</button>
+          </div>
+        </div>
+
+        <h3>Relações comerciais</h3>
+        <div id="relList" class="prop-list"></div>
+
+        <h3>Acontecimentos da rodada</h3>
+        <div id="eventsList" class="events-list"></div>
+
+        <p id="acaoMsg" class="tiny" hidden></p>
+      </div>
+
+      <!-- RESULTADOS -->
+      <div id="resPanel" class="pad" hidden>
+        <div id="resOngoing" class="ongoing-banner warn" hidden></div>
+        <h3>Resultados da rodada</h3>
+        <div id="resultsList" class="results-list"></div>
+      </div>
+
+      <div class="pad">
+        <h3>Meu cofre <span id="myFlag"></span></h3>
+        <div id="myCofre" class="cofre big"></div>
+        <div id="myStats" class="stats-row"></div>
+
+        <h3>Nações</h3>
+        <div id="nations" class="nations"></div>
+      </div>
+
+      <div class="host-controls pad" id="hostControls" hidden>
+        <button id="nextBtn" class="btn primary big">Avançar fase ▶</button>
+      </div>
+    </section>
+
+    <div id="toast" class="toast" hidden></div>
+  </main>
+
+  <footer class="foot tiny" id="foot"></footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

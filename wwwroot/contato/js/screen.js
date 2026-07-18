@@ -11,7 +11,7 @@ let lastResultSeen = null;
 
 async function start() {
   connection = new signalR.HubConnectionBuilder()
-    .withUrl("/gamehub")
+    .withUrl("/hubs/contato")
     .withAutomaticReconnect()
     .build();
 
@@ -27,7 +27,7 @@ async function start() {
 }
 
 function buildJoinUrl(code) {
-  return `${location.origin}/play.html?code=${code}`;
+  return `${location.origin}/contato/play.html?code=${code}`;
 }
 
 function renderState(s) {
