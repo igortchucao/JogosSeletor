@@ -1,9 +1,10 @@
-name: keep-warm
+name: acordar-servidor
 
+# O cron do GitHub Actions roda a cada 1-3h (nao a cada 10min) e nao segura o Render
+# acordado -> era inutil e spammava e-mail de falha. Virou um botao MANUAL de "acordar":
+# aba Actions -> acordar-servidor -> Run workflow, uns 40s antes de jogar.
 on:
-  schedule:
-    - cron: "*/10 * * * *"   # a cada 10 min (horário UTC)
-  workflow_dispatch: {}       # permite rodar manualmente pela aba Actions
+  workflow_dispatch: {}
 
 jobs:
   ping:
