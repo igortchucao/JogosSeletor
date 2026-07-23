@@ -191,7 +191,7 @@ input:focus { outline: none; border-color: var(--accent); }
 .cofre .res.hidden-res { opacity: .5; }
 
 /* itens internos (população / credibilidade / aprovação) */
-.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; margin-top: 8px; }
 .stat {
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center;
 }

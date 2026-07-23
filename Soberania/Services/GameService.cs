@@ -20,14 +20,14 @@ public class GameService
     // Recursos iniciais assimétricos só por sabor — a lógica econômica vem depois.
     private static readonly List<Country> Catalog = new()
     {
-        new() { Id = "brasil",   Name = "Brasil",          Emoji = "🇧🇷", Inicial = new() { Dinheiro = 800, Terra = 90, Petroleo = 40, Alimento = 90, Militares = 40, Divida = 60 },  StatsInicial = new() { Populacao = 215, Credibilidade = 50, Aprovacao = 60 } },
-        new() { Id = "eua",      Name = "Estados Unidos",  Emoji = "🇺🇸", Inicial = new() { Dinheiro = 1500, Terra = 70, Petroleo = 50, Alimento = 70, Militares = 90, Divida = 120 }, StatsInicial = new() { Populacao = 335, Credibilidade = 65, Aprovacao = 55 } },
-        new() { Id = "russia",   Name = "Rússia",          Emoji = "🇷🇺", Inicial = new() { Dinheiro = 700, Terra = 100, Petroleo = 90, Alimento = 50, Militares = 85, Divida = 40 },  StatsInicial = new() { Populacao = 145, Credibilidade = 40, Aprovacao = 65 } },
-        new() { Id = "china",    Name = "China",           Emoji = "🇨🇳", Inicial = new() { Dinheiro = 1200, Terra = 80, Petroleo = 40, Alimento = 60, Militares = 80, Divida = 70 },  StatsInicial = new() { Populacao = 1410, Credibilidade = 55, Aprovacao = 60 } },
-        new() { Id = "arabia",   Name = "Arábia Saudita",  Emoji = "🇸🇦", Inicial = new() { Dinheiro = 1000, Terra = 50, Petroleo = 100, Alimento = 20, Militares = 55, Divida = 20 }, StatsInicial = new() { Populacao = 36, Credibilidade = 50, Aprovacao = 55 } },
-        new() { Id = "alemanha", Name = "Alemanha",        Emoji = "🇩🇪", Inicial = new() { Dinheiro = 1100, Terra = 55, Petroleo = 20, Alimento = 55, Militares = 60, Divida = 50 },  StatsInicial = new() { Populacao = 84, Credibilidade = 70, Aprovacao = 58 } },
-        new() { Id = "india",    Name = "Índia",           Emoji = "🇮🇳", Inicial = new() { Dinheiro = 600, Terra = 85, Petroleo = 30, Alimento = 80, Militares = 70, Divida = 55 },   StatsInicial = new() { Populacao = 1400, Credibilidade = 48, Aprovacao = 62 } },
-        new() { Id = "nigeria",  Name = "Nigéria",         Emoji = "🇳🇬", Inicial = new() { Dinheiro = 500, Terra = 75, Petroleo = 80, Alimento = 60, Militares = 45, Divida = 65 },   StatsInicial = new() { Populacao = 220, Credibilidade = 42, Aprovacao = 57 } },
+        new() { Id = "brasil",   Name = "Brasil",          Emoji = "🇧🇷", Inicial = new() { Dinheiro = 800, Terra = 90, Petroleo = 40, Alimento = 90, Militares = 40, Divida = 60 },  StatsInicial = new() { Populacao = 215, Credibilidade = 50, Satisfacao = 60 } },
+        new() { Id = "eua",      Name = "Estados Unidos",  Emoji = "🇺🇸", Inicial = new() { Dinheiro = 1500, Terra = 70, Petroleo = 50, Alimento = 70, Militares = 90, Divida = 120 }, StatsInicial = new() { Populacao = 335, Credibilidade = 65, Satisfacao = 55 } },
+        new() { Id = "russia",   Name = "Rússia",          Emoji = "🇷🇺", Inicial = new() { Dinheiro = 700, Terra = 100, Petroleo = 90, Alimento = 50, Militares = 85, Divida = 40 },  StatsInicial = new() { Populacao = 145, Credibilidade = 40, Satisfacao = 65 } },
+        new() { Id = "china",    Name = "China",           Emoji = "🇨🇳", Inicial = new() { Dinheiro = 1200, Terra = 80, Petroleo = 40, Alimento = 60, Militares = 80, Divida = 70 },  StatsInicial = new() { Populacao = 1410, Credibilidade = 55, Satisfacao = 60 } },
+        new() { Id = "arabia",   Name = "Arábia Saudita",  Emoji = "🇸🇦", Inicial = new() { Dinheiro = 1000, Terra = 50, Petroleo = 100, Alimento = 20, Militares = 55, Divida = 20 }, StatsInicial = new() { Populacao = 36, Credibilidade = 50, Satisfacao = 55 } },
+        new() { Id = "alemanha", Name = "Alemanha",        Emoji = "🇩🇪", Inicial = new() { Dinheiro = 1100, Terra = 55, Petroleo = 20, Alimento = 55, Militares = 60, Divida = 50 },  StatsInicial = new() { Populacao = 84, Credibilidade = 70, Satisfacao = 58 } },
+        new() { Id = "india",    Name = "Índia",           Emoji = "🇮🇳", Inicial = new() { Dinheiro = 600, Terra = 85, Petroleo = 30, Alimento = 80, Militares = 70, Divida = 55 },   StatsInicial = new() { Populacao = 1400, Credibilidade = 48, Satisfacao = 62 } },
+        new() { Id = "nigeria",  Name = "Nigéria",         Emoji = "🇳🇬", Inicial = new() { Dinheiro = 500, Terra = 75, Petroleo = 80, Alimento = 60, Militares = 45, Divida = 65 },   StatsInicial = new() { Populacao = 220, Credibilidade = 42, Satisfacao = 57 } },
     };
 
     // ----------------------------------------------------------------- baralho de cartas (Investimento)
@@ -40,17 +40,17 @@ public class GameService
         new() { Id = "covid",       Nome = "Pandemia (COVID)",   Emoji = "🦠", Alvo = "Todos", Efeito = "peste_global",
                 Descricao = "Todos perdem 2% dos recursos por turno e 10% da população.", Custo = new() { Dinheiro = 350 } },
         new() { Id = "escandalo",   Nome = "Escândalo Midiático", Emoji = "📰", Alvo = "Inimigo", Efeito = "reduz_cred_aprov",
-                Descricao = "O alvo perde credibilidade e aprovação.", Custo = new() { Dinheiro = 250 } },
-        new() { Id = "golpe",       Nome = "Golpe Militar",      Emoji = "🎖️", Alvo = "Inimigo", Efeito = "derruba_aprovacao",
-                Descricao = "Derruba a aprovação do alvo drasticamente.", Custo = new() { Dinheiro = 300, Militares = 40 } },
+                Descricao = "O alvo perde credibilidade e satisfação.", Custo = new() { Dinheiro = 250 } },
+        new() { Id = "golpe",       Nome = "Golpe Militar",      Emoji = "🎖️", Alvo = "Inimigo", Efeito = "derruba_satisfacao",
+                Descricao = "Derruba a satisfação do alvo drasticamente.", Custo = new() { Dinheiro = 300, Militares = 40 } },
         new() { Id = "estimulo",    Nome = "Pacote de Estímulo", Emoji = "💵", Alvo = "Proprio", Efeito = "sobe_aprov_pop",
-                Descricao = "Aumenta sua aprovação e sua população.", Custo = new() { Dinheiro = 250 } },
+                Descricao = "Aumenta sua satisfação e sua população.", Custo = new() { Dinheiro = 250 } },
         new() { Id = "propaganda",  Nome = "Propaganda Estatal", Emoji = "📢", Alvo = "Proprio", Efeito = "sobe_credibilidade",
                 Descricao = "Aumenta sua credibilidade.", Custo = new() { Dinheiro = 150 } },
         new() { Id = "petroleo",    Nome = "Descoberta de Petróleo", Emoji = "🛢️", Alvo = "Proprio", Efeito = "ganha_petroleo",
                 Descricao = "Novas reservas: ganha petróleo.", Custo = new() { Dinheiro = 300, Terra = 20 } },
         new() { Id = "humanitaria", Nome = "Ajuda Humanitária",  Emoji = "🕊️", Alvo = "Inimigo", Efeito = "diplomacia",
-                Descricao = "Envia ajuda: sobe a credibilidade e aprovação do alvo (diplomacia).", Custo = new() { Dinheiro = 200, Alimento = 40 } },
+                Descricao = "Envia ajuda: sobe a credibilidade e satisfação do alvo (diplomacia).", Custo = new() { Dinheiro = 200, Alimento = 40 } },
 
         // --- cartas contra países NPC (fornecedores) ---
         new() { Id = "sabotagem",   Nome = "Sabotar Fornecedor", Emoji = "💣", Alvo = "Npc", Efeito = "bloqueia_npc",
@@ -333,21 +333,21 @@ public class GameService
         {
             case "tsunami":
                 TiraRecurso(ref terra, 15, "🗺️"); TiraRecurso(ref alimento, 25, "🌾");
-                st.Populacao -= Perda(st.Populacao, 8); st.Aprovacao -= 5;
+                st.Populacao -= Perda(st.Populacao, 8); st.Satisfacao -= 5;
                 break;
             case "terremoto":
                 TiraRecurso(ref dinheiro, 15, "💰"); TiraRecurso(ref terra, 10, "🗺️");
                 TiraRecurso(ref militares, 15, "🪖");
-                st.Populacao -= Perda(st.Populacao, 10); st.Aprovacao -= 6;
+                st.Populacao -= Perda(st.Populacao, 10); st.Satisfacao -= 6;
                 break;
             case "enchente":
                 TiraRecurso(ref alimento, 30, "🌾"); TiraRecurso(ref terra, 12, "🗺️");
-                st.Populacao -= Perda(st.Populacao, 5); st.Aprovacao -= 4;
+                st.Populacao -= Perda(st.Populacao, 5); st.Satisfacao -= 4;
                 break;
             case "furacao":
                 TiraRecurso(ref dinheiro, 12, "💰"); TiraRecurso(ref alimento, 20, "🌾");
                 TiraRecurso(ref militares, 10, "🪖");
-                st.Populacao -= Perda(st.Populacao, 6); st.Aprovacao -= 5;
+                st.Populacao -= Perda(st.Populacao, 6); st.Satisfacao -= 5;
                 break;
         }
 
@@ -569,20 +569,22 @@ public class GameService
             case "destruir_recursos_metade_populacao":
                 target!.Cofre.Petroleo = 0; target.Cofre.Alimento = 0; target.Cofre.Militares = 0;
                 target.Cofre.Terra /= 2; target.Cofre.Dinheiro /= 2;
-                target.Stats.Populacao /= 2; target.Stats.Aprovacao -= 20; target.Stats.Clamp();
+                target.Stats.Populacao /= 2; target.Stats.Satisfacao -= 20; target.Stats.Clamp();
+                AjustaCredibilidade(room, target, -10);
                 return "Recursos arrasados e metade da população perdida.";
             case "reduz_cred_aprov":
-                target!.Stats.Credibilidade -= 15; target.Stats.Aprovacao -= 12; target.Stats.Clamp();
-                return "O alvo perdeu credibilidade e aprovação.";
-            case "derruba_aprovacao":
-                target!.Stats.Aprovacao -= 30; target.Stats.Clamp();
-                return "A aprovação do alvo despencou.";
+                target!.Stats.Satisfacao -= 12; target.Stats.Clamp();
+                AjustaCredibilidade(room, target, -15);
+                return "O alvo perdeu credibilidade e satisfação.";
+            case "derruba_satisfacao":
+                target!.Stats.Satisfacao -= 30; target.Stats.Clamp();
+                return "A satisfação do alvo despencou.";
             case "diplomacia":
-                target!.Stats.Credibilidade += 10; target.Stats.Aprovacao += 8; target.Stats.Clamp();
-                return "Ajuda enviada: credibilidade e aprovação do alvo subiram.";
+                target!.Stats.Credibilidade += 10; target.Stats.Satisfacao += 8; target.Stats.Clamp();
+                return "Ajuda enviada: credibilidade e satisfação do alvo subiram.";
             case "sobe_aprov_pop":
-                actor.Stats.Aprovacao += 10; actor.Stats.Populacao += 5; actor.Stats.Clamp();
-                return "Sua aprovação e população subiram.";
+                actor.Stats.Satisfacao += 10; actor.Stats.Populacao += 5; actor.Stats.Clamp();
+                return "Sua satisfação e população subiram.";
             case "sobe_credibilidade":
                 actor.Stats.Credibilidade += 15; actor.Stats.Clamp();
                 return "Sua credibilidade subiu.";
@@ -625,7 +627,7 @@ public class GameService
             {
                 int perdaPop = vantagem * 2;
                 t.Stats.Populacao = Math.Max(0, t.Stats.Populacao - perdaPop);
-                t.Stats.Aprovacao -= 5; t.Stats.Clamp();
+                t.Stats.Satisfacao -= 5; t.Stats.Clamp();
                 int saque = vantagem / 2;
                 int petro = Math.Min(saque, Math.Max(0, t.Cofre.Petroleo));
                 int alim = Math.Min(saque, Math.Max(0, t.Cofre.Alimento));
@@ -662,9 +664,12 @@ public class GameService
             if (a.Cofre.Dinheiro < DefameCost) return Fail($"Difamar custa {DefameCost} 💰.");
 
             a.Cofre.Dinheiro -= DefameCost;
-            t.Stats.Credibilidade -= 10; t.Stats.Aprovacao -= 8; t.Stats.Clamp();
+            t.Stats.Satisfacao -= 8; t.Stats.Clamp();
+            AjustaCredibilidade(room, t, -10);
+            // sujar o vizinho respinga em você: difamar custa credibilidade própria
+            AjustaCredibilidade(room, a, -DefameSelfCredCost);
             RecordEvent(room, a.Id, t.Id, "difamar",
-                $"📢 {Label(room, a.Id)} difamou {Label(room, t.Id)}: -10 credibilidade, -8 aprovação.");
+                $"📢 {Label(room, a.Id)} difamou {Label(room, t.Id)}: -10 credibilidade e -8 satisfação no alvo, -{DefameSelfCredCost} de credibilidade em quem difamou.");
         }
 
         await BroadcastStateAsync(room);
@@ -736,6 +741,60 @@ public class GameService
         await BroadcastStateAsync(room);
     }
 
+    // ================================================================= EFEITOS EM CASCATA
+    // Valores concentrados aqui de propósito — é o que vamos afinar depois.
+    private const int DefameSelfCredCost = 4;        // difamar suja também quem difama (alvo perde 10)
+    private const int ContagioCredibilidadePct = 50; // parceiro comercial absorve 50% da queda alheia
+
+    // evasão (gente indo embora)
+    private const int FomeDeficitPorPctPop = 2;      // cada 2 de déficit de comida = 1% de fuga
+    private const int SatisfacaoPorPctEvasao = 10;   // cada 10 pontos de satisfação NEGATIVA = 1% de fuga
+    private const int EvasaoTetoPct = 30;            // teto de 30% da população por rodada
+    private const int FomeDeficitPorCred = 5;        // cada 5 de déficit = -1 credibilidade
+    private const int FomeCredTeto = 20;
+
+    private const int SatisfacaoGolpe = -50;         // satisfação nesse patamar derruba o líder
+
+    // guerra civil
+    private const int CredRiscoGuerraCivil = 30;     // abaixo disso começa o risco; em 0 é certeza
+    private const int MilitarSeguro = 30;            // militares abaixo disso agravam o risco
+    private const int MilitarAgravanteMax = 40;      // quanto o militar fraco soma na chance
+
+    /// <summary>Quem tem relação comercial ATIVA com este jogador.</summary>
+    private static IEnumerable<Player> ParceirosComerciais(Room room, string playerId) =>
+        room.Relations
+            .Where(r => r.Status == RelationStatus.Ativa && (r.FromId == playerId || r.ToId == playerId))
+            .Select(r => r.FromId == playerId ? r.ToId : r.FromId)
+            .Distinct()
+            .Select(id => room.Players.FirstOrDefault(p => p.Id == id))
+            .Where(p => p != null && p.ChoseCountry && !p.Deposto)!;
+
+    /// <summary>
+    /// Único caminho para mexer em credibilidade. PERDAS contaminam os parceiros comerciais
+    /// (fazer negócio com país desmoralizado te queima junto). Um salto só — sem recursão.
+    /// </summary>
+    private static void AjustaCredibilidade(Room room, Player alvo, int delta)
+    {
+        alvo.Stats.Credibilidade += delta;
+        alvo.Stats.Clamp();
+        if (delta >= 0) return;
+
+        int contagio = (-delta) * ContagioCredibilidadePct / 100;
+        if (contagio <= 0) return;
+
+        foreach (var parceiro in ParceirosComerciais(room, alvo.Id).ToList())
+        {
+            parceiro.Stats.Credibilidade -= contagio;
+            parceiro.Stats.Clamp();
+            room.Events.Add(new GameEvent
+            {
+                Round = room.Round, Phase = room.Phase, Kind = "relacao",
+                ActorId = "", TargetId = parceiro.Id,
+                Text = $"🔗 {LabelFor(room, parceiro)} perdeu {contagio} de credibilidade por ter acordo comercial com {LabelFor(room, alvo)}."
+            });
+        }
+    }
+
     // -------- helpers de Ações --------
     private static object Fail(string error) => new { ok = false, error };
 
@@ -784,9 +843,13 @@ public class GameService
         foreach (var p in ativos)
         {
             var s = p.Stats;
-            int imposto = s.Populacao * s.Aprovacao / 100;
+            // satisfação negativa não gera imposto negativo: o povo simplesmente para de pagar
+            int satisfacaoArrecadadora = Math.Max(0, s.Satisfacao);
+            int imposto = s.Populacao * satisfacaoArrecadadora / 100;
             p.Cofre.Dinheiro += imposto;
-            p.LastResults.Add($"💰 Impostos: +{imposto} (população {s.Populacao}mi × aprovação {s.Aprovacao}%).");
+            p.LastResults.Add(s.Satisfacao > 0
+                ? $"💰 Impostos: +{imposto} (população {s.Populacao}mi × satisfação {s.Satisfacao}%)."
+                : $"💰 Impostos: +0 — com satisfação em {s.Satisfacao}% o povo não paga imposto.");
 
             int crescimento = s.Credibilidade / 25;
             if (crescimento > 0)
@@ -832,7 +895,75 @@ public class GameService
             to.LastResults.Add($"🤝 Relação com {LabelFor(room, from)}: você deu {Descrever(rel.ToGives)} e recebeu {Descrever(rel.FromGives)}.");
         }
 
-        // 4) golpe por aprovação baixa (depois de todos os efeitos)
+        // 3b) EVASÃO: gente indo embora. Duas causas somam — passar fome e viver infeliz.
+        foreach (var p in ativos)
+        {
+            var s = p.Stats;
+            int pctFome = 0, pctInfeliz = 0;
+            int deficit = p.Cofre.Alimento < 0 ? -p.Cofre.Alimento : 0;
+
+            if (deficit > 0)
+            {
+                pctFome = deficit / FomeDeficitPorPctPop;
+                int perdaCred = Math.Min(FomeCredTeto, deficit / FomeDeficitPorCred);
+                if (perdaCred > 0)
+                {
+                    AjustaCredibilidade(room, p, -perdaCred);
+                    p.LastResults.Add($"🍽️ A fome (déficit de {deficit} 🌾) derrubou {perdaCred} de credibilidade.");
+                }
+            }
+
+            // satisfação negativa: cada 10 pontos abaixo de zero = 1% de fuga
+            if (s.Satisfacao < 0) pctInfeliz = (-s.Satisfacao) / SatisfacaoPorPctEvasao;
+
+            int pct = Math.Min(EvasaoTetoPct, pctFome + pctInfeliz);
+            s.EvasaoPct = pct;
+            if (pct <= 0) continue;
+
+            int foram = Perda(s.Populacao, pct);
+            s.Populacao -= foram;
+            var causa = pctFome > 0 && pctInfeliz > 0 ? "fome e revolta"
+                      : (pctFome > 0 ? "fome" : "revolta popular");
+            p.LastResults.Add($"🧳 Evasão de {pct}% por {causa}: {foram}mi de pessoas deixaram o país.");
+        }
+
+        // 3c) GUERRA CIVIL: credibilidade baixa é o gatilho; militar fraco agrava.
+        // Credibilidade 0 = 100% de chance.
+        foreach (var p in ativos.ToList())
+        {
+            var s = p.Stats;
+            if (s.Credibilidade >= CredRiscoGuerraCivil) continue;
+
+            int chance = (CredRiscoGuerraCivil - s.Credibilidade) * 100 / CredRiscoGuerraCivil;
+            int mil = Math.Max(0, p.Cofre.Militares);
+            if (mil < MilitarSeguro)
+                chance += (MilitarSeguro - mil) * MilitarAgravanteMax / MilitarSeguro;
+            chance = Math.Clamp(chance, 0, 100);
+
+            if (_rng.Next(100) >= chance)
+            {
+                p.LastResults.Add($"⚠️ Tensão interna: {chance}% de risco de guerra civil (credibilidade {s.Credibilidade}, militares {mil}).");
+                continue;
+            }
+
+            int perdaMil = Perda(p.Cofre.Militares, 40);
+            int perdaPop = Perda(s.Populacao, 10);
+            p.Cofre.Militares -= perdaMil;
+            s.Populacao -= perdaPop;
+            s.Satisfacao -= 25;
+            AjustaCredibilidade(room, p, -10);
+            s.Clamp();
+
+            p.LastResults.Add($"🔥 GUERRA CIVIL! (chance era {chance}%) -{perdaMil}🪖, -{perdaPop}mi de população, -25 satisfação.");
+            room.Events.Add(new GameEvent
+            {
+                Round = room.Round, Phase = room.Phase, Kind = "desastre", Public = true,
+                ActorId = "", TargetId = p.Id,
+                Text = $"🔥 Guerra civil em {LabelFor(room, p)}! O país se volta contra o próprio líder."
+            });
+        }
+
+        // 4) golpe por satisfação baixa (depois de todos os efeitos)
         foreach (var p in ativos)
         {
             p.Stats.Clamp();
@@ -842,16 +973,22 @@ public class GameService
                 Round = room.Round,
                 Dinheiro = p.Cofre.Dinheiro,
                 Populacao = p.Stats.Populacao,
-                Aprovacao = p.Stats.Aprovacao
+                Satisfacao = p.Stats.Satisfacao
             });
-            if (p.Stats.Aprovacao <= 0)
+            if (p.Stats.Satisfacao <= SatisfacaoGolpe)
             {
                 p.Deposto = true;
-                p.LastResults.Add("🚨 GOLPE! Aprovação zerada — a população derrubou o líder.");
+                p.LastResults.Add($"🚨 GOLPE! Satisfação em {p.Stats.Satisfacao}% — a população derrubou o líder.");
+                room.Events.Add(new GameEvent
+                {
+                    Round = room.Round, Phase = room.Phase, Kind = "desastre", Public = true,
+                    ActorId = "", TargetId = p.Id,
+                    Text = $"🚨 Golpe popular em {LabelFor(room, p)}! O líder foi deposto."
+                });
             }
-            else if (p.Stats.Aprovacao < 20)
+            else if (p.Stats.Satisfacao < 0)
             {
-                p.LastResults.Add($"⚠️ Aprovação muito baixa ({p.Stats.Aprovacao}%): risco de golpe da população!");
+                p.LastResults.Add($"⚠️ Povo revoltado ({p.Stats.Satisfacao}%): abaixo de {SatisfacaoGolpe}% o líder cai.");
             }
         }
     }
@@ -1089,7 +1226,7 @@ public class GameService
                             // histórico é público: alimenta os gráficos da tela de Resultados
                             history = p.History.Select(h => new
                             {
-                                round = h.Round, dinheiro = h.Dinheiro, populacao = h.Populacao, aprovacao = h.Aprovacao
+                                round = h.Round, dinheiro = h.Dinheiro, populacao = h.Populacao, satisfacao = h.Satisfacao
                             }).ToList(),
                             cofre = mostraPrivado ? CofreDto(p.Cofre) : null,
                             stats = mostraPrivado ? StatsDto(p.Stats) : null,
@@ -1169,7 +1306,8 @@ public class GameService
 
     private static object StatsDto(Stats s) => new
     {
-        populacao = s.Populacao, credibilidade = s.Credibilidade, aprovacao = s.Aprovacao
+        populacao = s.Populacao, credibilidade = s.Credibilidade,
+        satisfacao = s.Satisfacao, evasao = s.EvasaoPct
     };
 
     // DTO de uma carta possuída; se <paramref name="cofre"/> vier, indica se dá para pagar (ofertas).

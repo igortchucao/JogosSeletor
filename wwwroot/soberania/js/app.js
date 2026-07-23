@@ -58,7 +58,8 @@ const RES = [
 const STATS = [
   { key: "populacao", label: "População", emoji: "👥" },
   { key: "credibilidade", label: "Credibilidade", emoji: "🎖️" },
-  { key: "aprovacao", label: "Aprovação", emoji: "📊" },
+  { key: "satisfacao", label: "Satisfação", emoji: "😀" },
+  { key: "evasao", label: "Evasão", emoji: "🧳" },
 ];
 
 // ---------- helpers de DOM ----------
@@ -286,12 +287,15 @@ function cofreHtml(cofre) {
 function statsHtml(stats) {
   if (!stats) return "";
   return STATS.map((st) => {
-    const low = st.key === "aprovacao" && stats[st.key] < 20;
-    const suffix = st.key === "populacao" ? "mi" : (st.key === "credibilidade" || st.key === "aprovacao" ? "%" : "");
+    const v = stats[st.key] ?? 0;
+    // satisfação vai de -100% a +100%: negativo é povo revoltado (perto de -50% cai o líder)
+    const low = (st.key === "satisfacao" && v < 0) || (st.key === "evasao" && v > 0);
+    const suffix = st.key === "populacao" ? "mi" : "%";
+    const sinal = st.key === "satisfacao" && v > 0 ? "+" : "";
     return `
     <div class="stat ${low ? "low" : ""}">
       <div class="slabel">${st.emoji} ${st.label}</div>
-      <div class="sval">${stats[st.key]}${suffix}</div>
+      <div class="sval">${sinal}${v}${suffix}</div>
     </div>`;
   }).join("");
 }
@@ -508,7 +512,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharModa
 // ---------- ações fixas (sempre disponíveis, como cartas) ----------
 const ACOES_FIXAS = [
   { id: "atacar",  nome: "Ataque Militar", emoji: "⚔️", descricao: "Invade o alvo. O dano depende da sua força militar contra a dele.", custo: null },
-  { id: "difamar", nome: "Difamação",      emoji: "📢", descricao: "Derruba a credibilidade e a aprovação do alvo.", custo: { dinheiro: 150, terra: 0, petroleo: 0, alimento: 0, militares: 0, divida: 0 } },
+  { id: "difamar", nome: "Difamação",      emoji: "📢", descricao: "Derruba a credibilidade e a satisfação do alvo.", custo: { dinheiro: 150, terra: 0, petroleo: 0, alimento: 0, militares: 0, divida: 0 } },
 ];
 
 function acaoFixa(id) {
@@ -564,14 +568,14 @@ function acaoMsg(msg, isErr) {
 }
 
 // ---------- resultados: abas + gráficos de evolução ----------
-// Escalas incompatíveis (dinheiro em milhares, população em milhões, aprovação 0-100),
+// Escalas incompatíveis (dinheiro em milhares, população em milhões, satisfação 0-100),
 // então são TRÊS gráficos separados — nunca dois eixos no mesmo desenho.
 let abaSelecionada = null;
 
 const METRICAS = [
   { key: "dinheiro",  label: "💰 Dinheiro",  cor: "#c98500", suf: "" },
   { key: "populacao", label: "👥 População", cor: "#3987e5", suf: "mi" },
-  { key: "aprovacao", label: "📊 Aprovação", cor: "#199e70", suf: "%" },
+  { key: "satisfacao", label: "😀 Satisfação", cor: "#199e70", suf: "%" },
 ];
 
 function miniChart(hist, m) {

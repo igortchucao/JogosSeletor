@@ -78,21 +78,26 @@ public class Cofre
 /// <summary>
 /// Itens internos do país que NÃO se compram nem se trocam. Regidos pelo jogo:
 /// população (renda por impostos), credibilidade (destrava acordos, cresce a população)
-/// e aprovação (baixa demais = risco de golpe).
+/// e satisfação (baixa demais = risco de golpe).
 /// </summary>
 public class Stats
 {
-    public int Populacao { get; set; }      // em milhões
-    public int Credibilidade { get; set; }  // 0..100
-    public int Aprovacao { get; set; }       // 0..100
+    public int Populacao { get; set; }        // em milhões
+    public int Credibilidade { get; set; }    // 0..100 — seu nome lá fora
+    public int Satisfacao { get; set; }        // -100..+100 — o humor do povo (0 = indiferente)
+    public int EvasaoPct { get; set; }         // % da população que fugiu na última rodada
 
-    public Stats Clone() => new() { Populacao = Populacao, Credibilidade = Credibilidade, Aprovacao = Aprovacao };
+    public Stats Clone() => new()
+    {
+        Populacao = Populacao, Credibilidade = Credibilidade,
+        Satisfacao = Satisfacao, EvasaoPct = EvasaoPct
+    };
 
-    // credibilidade e aprovação ficam em 0..100; população nunca negativa
+    // credibilidade 0..100; satisfação vai a negativo (povo revoltado); população nunca negativa
     public void Clamp()
     {
         Credibilidade = Math.Clamp(Credibilidade, 0, 100);
-        Aprovacao = Math.Clamp(Aprovacao, 0, 100);
+        Satisfacao = Math.Clamp(Satisfacao, -100, 100);
         if (Populacao < 0) Populacao = 0;
     }
 }
@@ -244,7 +249,7 @@ public class Player
 
     // Resultados: linhas do que mudou no último cálculo
     public List<string> LastResults { get; } = new();
-    public bool Deposto { get; set; }   // golpe: aprovação chegou a zero
+    public bool Deposto { get; set; }   // golpe: satisfação chegou a zero
     public bool Ready { get; set; }     // marcou "pronto" na fase atual (zera a cada fase)
 
     // histórico por rodada, para os gráficos da tela de Resultados
@@ -259,7 +264,7 @@ public class Snapshot
     public int Round { get; set; }
     public int Dinheiro { get; set; }
     public int Populacao { get; set; }
-    public int Aprovacao { get; set; }
+    public int Satisfacao { get; set; }
 }
 
 public class Room
