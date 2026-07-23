@@ -1,30 +1,31 @@
 # Handoff — o Soberania agora roda dentro do repo "Contato"
 
 > **TL;DR:** o Soberania **não é mais um projeto separado**. O código dele foi movido
-> para dentro do repositório `Contato`, que hoje hospeda **dois jogos** no mesmo
-> serviço ASP.NET Core. A pasta `C:\Users\igors\source\repos\Soberania` virou
-> **legado** — não edite lá, as mudanças não vão para lugar nenhum.
+> para dentro do projeto **JogosSeletor**, que hospeda **dois jogos** no mesmo
+> serviço ASP.NET Core. A antiga pasta `repos\Soberania` **foi apagada**.
 
 ---
 
 ## Onde o código está agora
 
-Tudo vive em **`C:\Users\igors\source\repos\Contato`** (repo git:
-https://github.com/igortchucao/Contato).
+Tudo vive num projeto só, chamado **JogosSeletor**
+(repo git: https://github.com/igortchucao/Contato).
 
 ```
-Contato/
+JogosSeletor/
 ├─ Program.cs                  ← registra os DOIS jogos
-├─ Contato.csproj              ← projeto único (.NET 10)
+├─ JogosSeletor.csproj         ← projeto único (.NET 10)
+├─ Infrastructure/             ← rate limit (vale para os dois jogos)
 │
-├─ Hubs/GameHub.cs             ┐
-├─ Models/GameModels.cs        ├─ jogo CONTATO (namespace Contato.*)
-├─ Services/GameService.cs     ┘
+├─ Contato/                    ← jogo CONTATO (namespace Contato.*)
+│   ├─ Hubs/GameHub.cs
+│   ├─ Models/GameModels.cs
+│   └─ Services/GameService.cs
 │
-├─ Soberania/
-│   ├─ Hubs/GameHub.cs         ┐
-│   ├─ Models/GameModels.cs    ├─ jogo SOBERANIA (namespace Soberania.*)
-│   └─ Services/GameService.cs ┘
+├─ Soberania/                  ← jogo SOBERANIA (namespace Soberania.*)
+│   ├─ Hubs/GameHub.cs
+│   ├─ Models/GameModels.cs
+│   └─ Services/GameService.cs
 │
 └─ wwwroot/
     ├─ index.html              ← menu: escolhe o jogo
@@ -125,7 +126,7 @@ por WebSocket.
 
 ## Checklist do que NÃO fazer
 
-- ❌ Não editar `C:\Users\igors\source\repos\Soberania` (pasta legado)
+- ❌ Não recriar `repos\Soberania` (foi apagada; o código vive em `JogosSeletor/Soberania/`)
 - ❌ Não usar a rota `/gamehub` (não existe mais — são `/hubs/soberania` e `/hubs/contato`)
 - ❌ Não importar os dois namespaces no mesmo arquivo
 - ❌ Não deployar o work-in-progress sem resolver o bug de IDs duplicados

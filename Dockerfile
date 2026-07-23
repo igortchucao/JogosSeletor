@@ -1,10 +1,10 @@
 # ---- build ----
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY Contato.csproj ./
+COPY JogosSeletor.csproj ./
 RUN dotnet restore
 COPY . ./
-RUN dotnet publish Contato.csproj -c Release -o /app /p:UseAppHost=false
+RUN dotnet publish JogosSeletor.csproj -c Release -o /app /p:UseAppHost=false
 
 # ---- runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
@@ -15,4 +15,4 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 # e estoura a memoria do container -> crash (exit 139). Workstation GC usa bem menos.
 ENV DOTNET_gcServer=0
 # a porta real vem da variável PORT (Render); Program.cs lê ela
-ENTRYPOINT ["dotnet", "Contato.dll"]
+ENTRYPOINT ["dotnet", "JogosSeletor.dll"]
