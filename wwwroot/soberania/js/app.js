@@ -368,7 +368,8 @@ function renderAcoes(s) {
   // quem me agrediu nesta rodada (alvos válidos de represália)
   const aggMap = new Map();
   for (const e of (s.events || [])) {
-    if (e.againstMe && (e.kind === "militar" || e.kind === "difamar" || e.kind === "carta") && e.actorId)
+    // só agressões da fase de Ações dão direito a revide (não os próprios revides)
+    if (e.againstMe && e.phase === "Acoes" && (e.kind === "militar" || e.kind === "difamar" || e.kind === "carta") && e.actorId)
       if (!aggMap.has(e.actorId)) aggMap.set(e.actorId, e.actorLabel || "agressor");
   }
   const aggressors = [...aggMap.entries()].map(([id, label]) => ({ id, label }));
@@ -381,6 +382,14 @@ function renderAcoes(s) {
       : "🛡️ Represálias — ninguém te agrediu nesta rodada. Nada a revidar.";
     show(banner);
   } else hide(banner);
+
+  // desastre natural desta rodada (o jogo agindo sozinho)
+  const db = $("disasterBanner");
+  const desastres = (s.events || []).filter((e) => e.kind === "desastre");
+  if (desastres.length) {
+    db.innerHTML = desastres.map((e) => `<div>${e.text}</div>`).join("");
+    show(db);
+  } else hide(db);
 
   // efeitos contínuos ativos
   const ob = $("ongoingBanner");
@@ -463,7 +472,8 @@ function renderEvents(s, el) {
   if (!evs.length) { el.innerHTML = '<div class="empty-note">Nada aconteceu ainda.</div>'; return; }
   for (const e of evs) {
     const div = document.createElement("div");
-    div.className = "event" + (e.againstMe ? " againstMe" : (e.mine ? " mine" : ""));
+    div.className = "event" + (e.kind === "desastre" ? " desastre"
+      : (e.againstMe ? " againstMe" : (e.mine ? " mine" : "")));
     div.textContent = e.text;
     el.appendChild(div);
   }

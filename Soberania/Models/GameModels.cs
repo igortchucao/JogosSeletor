@@ -205,10 +205,12 @@ public class GameEvent
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public int Round { get; set; }
+    public GamePhase Phase { get; set; }      // fase em que ocorreu (só agressão em Ações dá direito a revide)
     public string ActorId { get; set; } = "";
     public string? TargetId { get; set; }
     public string Text { get; set; } = "";
-    public string Kind { get; set; } = "";   // "militar" | "difamar" | "carta" | "relacao"
+    public string Kind { get; set; } = "";   // "militar" | "difamar" | "carta" | "relacao" | "desastre"
+    public bool Public { get; set; }          // desastre natural é notícia: todos veem na hora
 }
 
 /// <summary>Catálogo de países que um jogador pode assumir. Recursos iniciais assimétricos, por sabor.</summary>

@@ -287,7 +287,84 @@ public class GameService
         room.PhaseDeadlineUtc = DateTime.UtcNow.AddSeconds(PhaseSeconds.TryGetValue(phase, out var s) ? s : 60);
 
         if (phase == GamePhase.Investimento) DealCards(room);
+        else if (phase == GamePhase.Acoes) MaybeTriggerDisaster(room);
         else if (phase == GamePhase.Resultados) ComputeResults(room);
+    }
+
+    // ----------------------------------------------------------------- desastres naturais
+    // O próprio jogo age: raro, sem culpado, para quebrar a rotina. Sorteado ao entrar em Ações.
+    private const int DisasterChancePct = 12;   // chance por rodada (tunável)
+
+    private record DisasterDef(string Id, string Nome, string Emoji, string Manchete);
+
+    private static readonly List<DisasterDef> Disasters = new()
+    {
+        new("tsunami",   "Tsunami",   "🌊", "Ondas gigantes devastam o litoral"),
+        new("terremoto", "Terremoto", "🏚️", "A terra treme e derruba cidades inteiras"),
+        new("enchente",  "Enchente",  "💧", "As águas sobem e afogam as lavouras"),
+        new("furacao",   "Furacão",   "🌀", "Ventos arrasam a infraestrutura"),
+    };
+
+    /// <summary>Perda proporcional: quem é grande perde mais, mas nunca some do mapa.</summary>
+    private static int Perda(int valor, int pct) => valor > 0 ? Math.Max(1, valor * pct / 100) : 0;
+
+    private static void MaybeTriggerDisaster(Room room)
+    {
+        if (_rng.Next(100) >= DisasterChancePct) return;
+
+        var candidatos = room.Players.Where(p => p.ChoseCountry && !p.Deposto).ToList();
+        if (candidatos.Count == 0) return;
+
+        var vitima = candidatos[_rng.Next(candidatos.Count)];
+        var d = Disasters[_rng.Next(Disasters.Count)];
+        var c = vitima.Cofre;
+        var st = vitima.Stats;
+        var perdas = new List<string>();
+
+        void TiraRecurso(ref int campo, int pct, string emoji)
+        {
+            var perda = Perda(campo, pct);
+            if (perda > 0) { campo -= perda; perdas.Add($"-{perda}{emoji}"); }
+        }
+
+        int dinheiro = c.Dinheiro, terra = c.Terra, alimento = c.Alimento, militares = c.Militares;
+
+        switch (d.Id)
+        {
+            case "tsunami":
+                TiraRecurso(ref terra, 15, "🗺️"); TiraRecurso(ref alimento, 25, "🌾");
+                st.Populacao -= Perda(st.Populacao, 8); st.Aprovacao -= 5;
+                break;
+            case "terremoto":
+                TiraRecurso(ref dinheiro, 15, "💰"); TiraRecurso(ref terra, 10, "🗺️");
+                TiraRecurso(ref militares, 15, "🪖");
+                st.Populacao -= Perda(st.Populacao, 10); st.Aprovacao -= 6;
+                break;
+            case "enchente":
+                TiraRecurso(ref alimento, 30, "🌾"); TiraRecurso(ref terra, 12, "🗺️");
+                st.Populacao -= Perda(st.Populacao, 5); st.Aprovacao -= 4;
+                break;
+            case "furacao":
+                TiraRecurso(ref dinheiro, 12, "💰"); TiraRecurso(ref alimento, 20, "🌾");
+                TiraRecurso(ref militares, 10, "🪖");
+                st.Populacao -= Perda(st.Populacao, 6); st.Aprovacao -= 5;
+                break;
+        }
+
+        c.Dinheiro = dinheiro; c.Terra = terra; c.Alimento = alimento; c.Militares = militares;
+        st.Clamp();
+
+        var detalhe = perdas.Count > 0 ? " " + string.Join(" ", perdas) : "";
+        room.Events.Add(new GameEvent
+        {
+            Round = room.Round,
+            Phase = GamePhase.Acoes,
+            ActorId = "",                       // sem culpado: não gera direito a represália
+            TargetId = vitima.Id,
+            Kind = "desastre",
+            Public = true,                      // é notícia: todos veem na hora
+            Text = $"{d.Emoji} {d.Nome} em {LabelFor(room, vitima)}! {d.Manchete}.{detalhe} e a população caiu."
+        });
     }
 
     /// <summary>Decide e aplica a próxima fase (fecha a rodada depois de Resultados). Chamar sob lock.</summary>
@@ -663,9 +740,11 @@ public class GameService
     private static object Fail(string error) => new { ok = false, error };
 
     // quem agrediu (militar/difamar/carta) o jogador NESTA rodada — alvos válidos de represália
+    // Só agressões da fase de AÇÕES dão direito a revide — senão o revide de A vira
+    // "agressão" contra B, que revida de volta, e as Represálias viram um vai-e-volta infinito.
     private static HashSet<string> AggressorsOf(Room room, string victimId) =>
         room.Events
-            .Where(e => e.Round == room.Round && e.TargetId == victimId
+            .Where(e => e.Round == room.Round && e.Phase == GamePhase.Acoes && e.TargetId == victimId
                         && (e.Kind == "militar" || e.Kind == "difamar" || e.Kind == "carta"))
             .Select(e => e.ActorId)
             .ToHashSet();
@@ -682,7 +761,7 @@ public class GameService
     }
 
     private static void RecordEvent(Room room, string actorId, string? targetId, string kind, string text) =>
-        room.Events.Add(new GameEvent { Round = room.Round, ActorId = actorId, TargetId = targetId, Kind = kind, Text = text });
+        room.Events.Add(new GameEvent { Round = room.Round, Phase = room.Phase, ActorId = actorId, TargetId = targetId, Kind = kind, Text = text });
 
     private string Label(Room room, string playerId)
     {
@@ -1069,8 +1148,8 @@ public class GameService
                     ongoing = room.Ongoing.Select(e => new { nome = e.Nome, emoji = e.Emoji, roundsLeft = e.RoundsLeft, source = e.SourceLabel }).ToList(),
                     // eventos da rodada: durante o jogo só os que envolvem o jogador; em Resultados, todos
                     events = room.Events
-                        .Where(e => e.Round == room.Round && (revelaTudo || e.ActorId == viewer.Id || e.TargetId == viewer.Id))
-                        .Select(e => new { id = e.Id, text = e.Text, kind = e.Kind, actorId = e.ActorId, actorLabel = Label(room, e.ActorId), mine = e.ActorId == viewer.Id, againstMe = e.TargetId == viewer.Id })
+                        .Where(e => e.Round == room.Round && (revelaTudo || e.Public || e.ActorId == viewer.Id || e.TargetId == viewer.Id))
+                        .Select(e => new { id = e.Id, text = e.Text, kind = e.Kind, phase = e.Phase.ToString(), actorId = e.ActorId, actorLabel = Label(room, e.ActorId), mine = e.ActorId == viewer.Id, againstMe = e.TargetId == viewer.Id })
                         .ToList()
                 };
                 payloads.Add((viewer.Id, dto));

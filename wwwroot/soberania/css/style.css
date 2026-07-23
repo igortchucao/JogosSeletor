@@ -266,6 +266,16 @@ h4 { margin: 16px 0 6px; font-size: 13px; color: var(--muted); }
   padding: 10px 12px; margin-bottom: 12px; font-size: 14px;
 }
 .ongoing-banner.warn { border-color: var(--accent2); }
+.ongoing-banner.disaster {
+  border-color: var(--danger); background: #2a1720; font-weight: 600;
+  animation: shake .5s ease;
+}
+@keyframes shake {
+  0%, 100% { transform: none; }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+.event.desastre { border-left-color: var(--danger); background: #2a1720; font-weight: 600; }
 
 .events-list { display: flex; flex-direction: column; gap: 6px; }
 .event {
