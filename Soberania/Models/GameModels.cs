@@ -283,6 +283,7 @@ public class Player
     public List<string> LastResults { get; } = new();
     public bool Deposto { get; set; }   // golpe: satisfação chegou a zero
     public bool Ready { get; set; }     // marcou "pronto" na fase atual (zera a cada fase)
+    public int TaxaImposto { get; set; } = 50;   // 0..100 — quanto você espreme a população
 
     // histórico por rodada, para os gráficos da tela de Resultados
     public List<Snapshot> History { get; } = new();

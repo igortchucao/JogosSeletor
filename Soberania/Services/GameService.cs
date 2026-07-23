@@ -83,6 +83,26 @@ public class GameService
 
     private const int PrazoMaximoRodadas = 6;
 
+    /// <summary>Arrecadação de uma rodada. Taxa 50 = arrecadação "normal"; 100 dobra, 0 zera.</summary>
+    private static int ImpostoDe(Player p) =>
+        p.Stats.Populacao * Math.Max(0, p.Stats.Satisfacao) / 100 * p.TaxaImposto / TaxaNeutra;
+
+    public async Task SetTaxRateAsync(string connectionId, string code, int taxa)
+    {
+        if (!_rooms.TryGetValue(code, out var room)) return;
+
+        lock (room.Sync)
+        {
+            // ajustável na fase de Ações (é uma decisão de governo, como as outras)
+            if (room.Phase != GamePhase.Acoes) return;
+            var p = room.Players.FirstOrDefault(x => x.Id == connectionId);
+            if (p == null || !p.ChoseCountry || p.Deposto) return;
+            p.TaxaImposto = Math.Clamp(taxa, 0, 100);
+        }
+
+        await BroadcastStateAsync(room);
+    }
+
     /// <summary>Taxa efetiva: credibilidade e satisfação melhoram (ou estragam) o rendimento.</summary>
     private static int RendimentoEfetivo(InvestmentDef def, Player p)
     {
@@ -856,6 +876,10 @@ public class GameService
 
     private const int SatisfacaoGolpe = -50;         // satisfação nesse patamar derruba o líder
 
+    // impostos: a barra que o jogador arrasta (0..100)
+    private const int TaxaNeutra = 50;               // no meio, não mexe na satisfação
+    private const int TaxaSatisfacaoDivisor = 5;     // cada 5 pontos de taxa acima/abaixo = 1 de satisfação
+
     // guerra civil
     private const int CredRiscoGuerraCivil = 30;     // abaixo disso começa o risco; em 0 é certeza
     private const int MilitarSeguro = 30;            // militares abaixo disso agravam o risco
@@ -944,13 +968,24 @@ public class GameService
         foreach (var p in ativos)
         {
             var s = p.Stats;
-            // satisfação negativa não gera imposto negativo: o povo simplesmente para de pagar
-            int satisfacaoArrecadadora = Math.Max(0, s.Satisfacao);
-            int imposto = s.Populacao * satisfacaoArrecadadora / 100;
+            // arrecadação = população × satisfação × a taxa que o líder escolheu.
+            // Satisfação negativa não gera imposto negativo: o povo simplesmente para de pagar.
+            int imposto = ImpostoDe(p);
             p.Cofre.Dinheiro += imposto;
             p.LastResults.Add(s.Satisfacao > 0
-                ? $"💰 Impostos: +{imposto} (população {s.Populacao}mi × satisfação {s.Satisfacao}%)."
+                ? $"💰 Impostos: +{imposto} (população {s.Populacao}mi × satisfação {s.Satisfacao}% × taxa {p.TaxaImposto}%)."
                 : $"💰 Impostos: +0 — com satisfação em {s.Satisfacao}% o povo não paga imposto.");
+
+            // apertar o povo rende agora e cobra depois; aliviar acalma
+            int deltaSatisf = (TaxaNeutra - p.TaxaImposto) / TaxaSatisfacaoDivisor;
+            if (deltaSatisf != 0)
+            {
+                s.Satisfacao += deltaSatisf;
+                s.Clamp();
+                p.LastResults.Add(deltaSatisf < 0
+                    ? $"😠 Carga tributária em {p.TaxaImposto}%: {deltaSatisf} de satisfação."
+                    : $"😀 Alívio tributário em {p.TaxaImposto}%: +{deltaSatisf} de satisfação.");
+            }
 
             // aplicações que venceram voltam com rendimento (ou quebram)
             LiquidaAplicacoes(room, p);
@@ -1308,6 +1343,12 @@ public class GameService
                         ? new DateTimeOffset(room.PhaseDeadlineUtc.Value).ToUnixTimeMilliseconds()
                         : (long?)null,
                     meReady = viewer.Ready,
+                    // barra de impostos + o que o servidor calcularia com a taxa atual
+                    taxaImposto = viewer.TaxaImposto,
+                    impostoPrevisto = ImpostoDe(viewer),
+                    satisfacaoPrevista = (TaxaNeutra - viewer.TaxaImposto) / TaxaSatisfacaoDivisor,
+                    taxaNeutra = TaxaNeutra,
+                    taxaSatisfacaoDivisor = TaxaSatisfacaoDivisor,
                     readyCount = room.Players.Count(p => p.Connected && p.ChoseCountry && !p.Deposto && p.Ready),
                     readyTotal = room.Players.Count(p => p.Connected && p.ChoseCountry && !p.Deposto),
                     players = room.Players.Select(p =>

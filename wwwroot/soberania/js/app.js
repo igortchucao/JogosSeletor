@@ -457,7 +457,66 @@ function readRel(prefix) {
   return out;
 }
 
+// ---------- impostos ----------
+let abaAcoes = "acoes";
+let arrastandoTax = false;
+$("tabAcoes").onclick = () => { abaAcoes = "acoes"; if (lastState) renderAcoes(lastState); };
+$("tabImpostos").onclick = () => { abaAcoes = "impostos"; if (lastState) renderAcoes(lastState); };
+
+// projeta localmente enquanto arrasta (o servidor recalcula igual ao confirmar)
+function previsaoImposto(s, taxa) {
+  const mine = me(s);
+  if (!mine || !mine.stats) return { dinheiro: 0, satisf: 0 };
+  const pop = mine.stats.populacao;
+  const satisf = Math.max(0, mine.stats.satisfacao);
+  const neutra = s.taxaNeutra || 50;
+  const divisor = s.taxaSatisfacaoDivisor || 5;
+  return {
+    dinheiro: Math.floor(Math.floor(pop * satisf / 100) * taxa / neutra),
+    satisf: Math.trunc((neutra - taxa) / divisor)
+  };
+}
+
+function pintaPrevisao(s, taxa) {
+  const p = previsaoImposto(s, taxa);
+  $("taxValue").textContent = `${taxa}%`;
+  $("taxMoney").textContent = `+${p.dinheiro}`;
+  const sat = $("taxSatisf");
+  sat.textContent = (p.satisf > 0 ? "+" : "") + p.satisf;
+  sat.className = "sval " + (p.satisf > 0 ? "up" : (p.satisf < 0 ? "down" : ""));
+  $("taxHint").textContent = p.satisf < 0
+    ? `Você arrecada mais agora, mas perde ${Math.abs(p.satisf)} de satisfação por rodada — e satisfação baixa derruba a própria arrecadação depois.`
+    : (p.satisf > 0
+        ? `Abre mão de dinheiro para ganhar ${p.satisf} de satisfação por rodada.`
+        : "Taxa neutra: não mexe na satisfação.");
+}
+
+$("taxSlider").oninput = () => {
+  arrastandoTax = true;
+  if (lastState) pintaPrevisao(lastState, parseInt($("taxSlider").value, 10));
+};
+$("taxSlider").onchange = async () => {
+  const taxa = parseInt($("taxSlider").value, 10);
+  await conn.invoke("SetTaxRate", myCode, taxa);
+  arrastandoTax = false;
+};
+
+function renderImpostos(s) {
+  // não sobrescreve a barra enquanto o dedo está nela
+  if (!arrastandoTax) $("taxSlider").value = s.taxaImposto ?? 50;
+  pintaPrevisao(s, parseInt($("taxSlider").value, 10));
+  $("taxSlider").disabled = s.phase !== "Acoes";
+}
+
 function renderAcoes(s) {
+  // abas: ações x impostos
+  const emAcoes = abaAcoes === "acoes";
+  $("tabAcoes").classList.toggle("active", emAcoes);
+  $("tabImpostos").classList.toggle("active", !emAcoes);
+  if (emAcoes) { show($("acoesConteudo")); hide($("impostosConteudo")); }
+  else { hide($("acoesConteudo")); show($("impostosConteudo")); }
+  renderImpostos(s);
+
   buildRelInputs();
   const isAcoes = s.phase === "Acoes";
   const isRepr = s.phase === "Represarias";

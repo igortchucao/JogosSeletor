@@ -313,6 +313,41 @@ h4 { margin: 16px 0 6px; font-size: 13px; color: var(--muted); }
 .btn.restrita { background: #4b2e83; border-color: #6b46c1; color: #fff; }
 .card .calvo.Npc { background: #6b46c1; color: #fff; }
 
+/* barra de impostos */
+.tax-box {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+}
+.tax-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.tax-stat {
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px; text-align: center;
+}
+.tax-stat .sval { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tax-stat .sval.up { color: var(--ok); }
+.tax-stat .sval.down { color: var(--danger); }
+.tax-slider {
+  width: 100%; margin: 8px 0; padding: 0; height: 28px; cursor: pointer;
+  background: transparent; -webkit-appearance: none; appearance: none;
+}
+.tax-slider::-webkit-slider-runnable-track {
+  height: 8px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--ok), var(--accent2) 50%, var(--danger));
+}
+.tax-slider::-moz-range-track {
+  height: 8px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--ok), var(--accent2) 50%, var(--danger));
+}
+.tax-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--txt); border: 3px solid var(--accent); margin-top: -8px; cursor: grab;
+}
+.tax-slider::-moz-range-thumb {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--txt); border: 3px solid var(--accent); cursor: grab;
+}
+.tax-scale { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.tax-scale span:nth-child(2) { font-size: 18px; font-weight: 700; color: var(--txt); }
+
 /* aplicações financeiras */
 .card.invest { border-color: var(--line); }
 .card .calvo.risco-baixo { background: var(--ok); color: #052e22; }

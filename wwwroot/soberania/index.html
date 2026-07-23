@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Soberania</title>
-<link rel="stylesheet" href="css/style.css?v=12" />
+<link rel="stylesheet" href="css/style.css?v=13" />
 </head>
 <body>
   <header class="topbar">
@@ -159,6 +159,36 @@
         <div id="disasterBanner" class="ongoing-banner disaster" hidden></div>
         <div id="ongoingBanner" class="ongoing-banner warn" hidden></div>
 
+        <div class="res-tabs" role="tablist">
+          <button class="res-tab active" id="tabAcoes" role="tab">⚔️ Ações</button>
+          <button class="res-tab" id="tabImpostos" role="tab">🏦 Impostos</button>
+        </div>
+
+        <!-- IMPOSTOS -->
+        <div id="impostosConteudo" hidden>
+          <h3>Carga tributária</h3>
+          <div class="tax-box">
+            <div class="tax-preview">
+              <div class="tax-stat">
+                <div class="slabel">💰 Arrecadação / rodada</div>
+                <div class="sval" id="taxMoney">0</div>
+              </div>
+              <div class="tax-stat">
+                <div class="slabel">😀 Satisfação / rodada</div>
+                <div class="sval" id="taxSatisf">0</div>
+              </div>
+            </div>
+            <input type="range" id="taxSlider" min="0" max="100" step="5" value="50" class="tax-slider" />
+            <div class="tax-scale tiny muted">
+              <span>0% — povo feliz, cofre vazio</span>
+              <span id="taxValue">50%</span>
+              <span>100% — cofre cheio, revolta</span>
+            </div>
+            <p class="tiny muted" id="taxHint"></p>
+          </div>
+        </div>
+
+        <div id="acoesConteudo">
         <div id="acoesTools">
           <h3>Ações sempre disponíveis</h3>
           <div id="acaoFixas" class="cards"></div>
@@ -183,6 +213,7 @@
         <div id="eventsList" class="events-list"></div>
 
         <p id="acaoMsg" class="tiny" hidden></p>
+        </div><!-- /acoesConteudo -->
       </div>
 
       <!-- RESULTADOS -->
@@ -232,6 +263,6 @@
   <footer class="foot tiny" id="foot"></footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
-  <script src="js/app.js?v=12"></script>
+  <script src="js/app.js?v=13"></script>
 </body>
 </html>

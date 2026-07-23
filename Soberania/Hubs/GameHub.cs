@@ -54,6 +54,10 @@ public class GameHub : Hub
     public Task<object> Defame(string code, string targetId) =>
         _game.DefameAsync(Context.ConnectionId, code, targetId);
 
+    // barra de impostos: quanto o líder espreme a própria população
+    public Task SetTaxRate(string code, int taxa) =>
+        _game.SetTaxRateAsync(Context.ConnectionId, code, taxa);
+
     public Task<object> ProposeRelation(string code, string toId, ResourceDto fromGives, ResourceDto toGives) =>
         _game.ProposeRelationAsync(Context.ConnectionId, code, toId, fromGives, toGives);
 
