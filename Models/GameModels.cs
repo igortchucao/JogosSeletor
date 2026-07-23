@@ -14,7 +14,8 @@ public enum GamePhase
 
 public class Player
 {
-    public string Id { get; set; } = "";   // connectionId do SignalR
+    public string Id { get; set; } = "";      // connectionId do SignalR (MUDA a cada reconexão)
+    public string Token { get; set; } = "";   // identidade estável do cliente (não muda ao reconectar)
     public string Name { get; set; } = "";
     public int Score { get; set; }
     public bool Connected { get; set; } = true;
@@ -23,7 +24,8 @@ public class Player
 public class Room
 {
     public string Code { get; set; } = "";
-    public string? HostConnectionId { get; set; }
+    public string? HostConnectionId { get; set; }   // telão (muda ao reconectar)
+    public string HostToken { get; set; } = "";      // identidade estável do telão
     public List<Player> Players { get; } = new();
     public GamePhase Phase { get; set; } = GamePhase.Lobby;
 
@@ -48,6 +50,9 @@ public class Room
     public string? LastResultWord { get; set; }  // a palavra que fez o contato
 
     public object Sync { get; } = new();
+
+    /// <summary>Última vez que algo aconteceu na sala — usado para limpar salas abandonadas.</summary>
+    public DateTime LastActivityUtc { get; set; } = DateTime.UtcNow;
 
     public int WordLength => SecretWord.Length;
 

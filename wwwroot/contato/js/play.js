@@ -3,8 +3,21 @@ const $ = (id) => document.getElementById(id);
 
 let connection;
 let myId = null;
+let myName = null;
 let roomCode = null;
 let joined = false;
+
+// identidade estável do jogador: o connectionId muda ao reconectar, o token não
+const myToken = (() => {
+  const KEY = "contato.playerToken";
+  let t = null;
+  try { t = sessionStorage.getItem(KEY); } catch { /* modo privado */ }
+  if (!t) {
+    t = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now());
+    try { sessionStorage.setItem(KEY, t); } catch { /* ignora */ }
+  }
+  return t;
+})();
 let lastResultSeen = null;
 let cdTimer = null;
 let prevPhase = null;
@@ -32,6 +45,16 @@ async function start() {
   connection.on("state", renderState);
   connection.on("secret", w => { $("secretWord").textContent = w || "—"; });
 
+  // Ao reconectar vem um connectionId NOVO e a conexão sai do grupo da sala.
+  // Sem re-entrar, o jogador vira órfão (servidor guarda o ID morto, param os "state").
+  connection.onreconnected(async () => {
+    if (!joined || !roomCode || !myName) return;
+    try {
+      const res = await connection.invoke("JoinRoom", roomCode, myName, myToken);
+      if (res && res.ok) myId = res.playerId;
+    } catch (e) { console.error(e); }
+  });
+
   await connection.start();
   myId = connection.connectionId;
 
@@ -47,10 +70,11 @@ async function join() {
   $("joinError").hidden = true;
   if (!code || !name) { showErr("Preencha código e nome."); return; }
 
-  const res = await connection.invoke("JoinRoom", code, name);
+  const res = await connection.invoke("JoinRoom", code, name, myToken);
   if (!res.ok) { showErr(res.error); return; }
 
   myId = res.playerId;
+  myName = name;
   roomCode = res.code;
   joined = true;
   $("roomCode").textContent = roomCode;

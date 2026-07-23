@@ -8,10 +8,14 @@ public class GameHub : Hub
     private readonly GameService _game;
     public GameHub(GameService game) => _game = game;
 
-    public Task<string> CreateRoom() => _game.CreateRoomAsync(Context.ConnectionId);
+    public Task<string> CreateRoom(string token) => _game.CreateRoomAsync(Context.ConnectionId, token);
 
-    public Task<object> JoinRoom(string code, string name) =>
-        _game.JoinRoomAsync(Context.ConnectionId, code, name);
+    public Task<object> JoinRoom(string code, string name, string token) =>
+        _game.JoinRoomAsync(Context.ConnectionId, code, name, token);
+
+    // telão reassume a sala depois de reconectar (connectionId novo, mesmo token)
+    public Task<bool> ReclaimHost(string code, string token) =>
+        _game.ReclaimHostAsync(Context.ConnectionId, code, token);
 
     public Task StartRound(string code) => _game.StartRoundAsync(Context.ConnectionId, code);
 

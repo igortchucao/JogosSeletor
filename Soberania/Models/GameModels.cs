@@ -201,7 +201,8 @@ public class Country
 
 public class Player
 {
-    public string Id { get; set; } = "";      // connectionId do SignalR
+    public string Id { get; set; } = "";      // connectionId do SignalR (MUDA a cada reconexão)
+    public string Token { get; set; } = "";   // identidade estável do cliente (não muda ao reconectar)
     public string Name { get; set; } = "";
     public bool Connected { get; set; } = true;
 
@@ -228,6 +229,7 @@ public class Room
 {
     public string Code { get; set; } = "";
     public string? HostConnectionId { get; set; }
+    public string HostToken { get; set; } = "";   // quem é o host de verdade, sobrevive à reconexão
     public List<Player> Players { get; } = new();
     public GamePhase Phase { get; set; } = GamePhase.Lobby;
     public int Round { get; set; }             // 0 no lobby; começa em 1 ao iniciar o jogo
@@ -238,4 +240,7 @@ public class Room
     public List<GameEvent> Events { get; } = new();
 
     public object Sync { get; } = new();
+
+    /// <summary>Última vez que algo aconteceu na sala — usado para limpar salas abandonadas.</summary>
+    public DateTime LastActivityUtc { get; set; } = DateTime.UtcNow;
 }

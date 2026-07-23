@@ -1,6 +1,14 @@
+using Microsoft.AspNetCore.SignalR;   // necessário para options.AddFilter<T>()
+
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    // rate limit por conexão (vale para os dois jogos)
+    options.AddFilter<Contato.Infrastructure.RateLimitFilter>();
+    // teto no tamanho da mensagem: evita payload gigante estourar a memória
+    options.MaximumReceiveMessageSize = 8 * 1024;   // 8 KB
+});
 
 // cada jogo tem seu próprio serviço de estado (as classes têm o mesmo nome,
 // por isso ficam sempre qualificadas pelo namespace do jogo)

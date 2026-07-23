@@ -3,6 +3,18 @@ const $ = (id) => document.getElementById(id);
 
 let connection;
 let roomCode = null;
+
+// identidade estável do telão: o connectionId muda ao reconectar, o token não
+const hostToken = (() => {
+  const KEY = "contato.hostToken";
+  let t = null;
+  try { t = sessionStorage.getItem(KEY); } catch { /* modo privado */ }
+  if (!t) {
+    t = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now());
+    try { sessionStorage.setItem(KEY, t); } catch { /* ignora */ }
+  }
+  return t;
+})();
 let qr = null;
 let countdownTimer = null;
 let prevPhase = null;
@@ -18,12 +30,17 @@ async function start() {
   connection.on("state", renderState);
 
   connection.onreconnected(async () => {
-    // ao reconectar, cria uma sala nova só se ainda não temos uma
-    if (!roomCode) roomCode = await connection.invoke("CreateRoom");
+    // O connectionId mudou: sem reassumir, o servidor ainda aponta o host para o ID morto
+    // e o telão perde o controle da sala (além de sair do grupo e parar de receber "state").
+    if (roomCode) {
+      const ok = await connection.invoke("ReclaimHost", roomCode, hostToken);
+      if (ok) return;
+    }
+    roomCode = await connection.invoke("CreateRoom", hostToken);
   });
 
   await connection.start();
-  roomCode = await connection.invoke("CreateRoom");
+  roomCode = await connection.invoke("CreateRoom", hostToken);
 }
 
 function buildJoinUrl(code) {

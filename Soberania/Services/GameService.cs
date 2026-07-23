@@ -66,17 +66,45 @@ public class GameService
     };
 
     // ----------------------------------------------------------------- criar sala
-    public async Task<object> CreateRoomAsync(string connectionId, string name)
+    // --- limites de recurso (evitam estourar a memória do container) ---
+    private const int MaxRooms = 200;
+    private static readonly TimeSpan EmptyRoomTtl = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan IdleRoomTtl = TimeSpan.FromHours(3);
+
+    /// <summary>Descarta salas abandonadas (sem ninguém conectado) ou paradas há muito tempo.</summary>
+    private void PurgeStaleRooms()
+    {
+        var now = DateTime.UtcNow;
+        foreach (var kv in _rooms)
+        {
+            var room = kv.Value;
+            bool stale;
+            lock (room.Sync)
+            {
+                var idle = now - room.LastActivityUtc;
+                var ninguem = !room.Players.Any(p => p.Connected);
+                stale = (ninguem && idle > EmptyRoomTtl) || idle > IdleRoomTtl;
+            }
+            if (stale) _rooms.TryRemove(kv.Key, out _);
+        }
+    }
+
+    public async Task<object> CreateRoomAsync(string connectionId, string name, string token)
     {
         name = (name ?? "").Trim();
         if (name.Length == 0) return new { ok = false, error = "Digite um nome." };
         if (name.Length > 20) name = name[..20];
+        token = SanitizeToken(token);
+
+        PurgeStaleRooms();
+        if (_rooms.Count >= MaxRooms)
+            return new { ok = false, error = "O servidor está cheio de salas. Tente de novo em alguns minutos." };
 
         string code;
         do { code = GenerateCode(); } while (_rooms.ContainsKey(code));
 
-        var room = new Room { Code = code, HostConnectionId = connectionId };
-        room.Players.Add(new Player { Id = connectionId, Name = name });
+        var room = new Room { Code = code, HostConnectionId = connectionId, HostToken = token };
+        room.Players.Add(new Player { Id = connectionId, Token = token, Name = name });
         _rooms[code] = room;
 
         await _hub.Groups.AddToGroupAsync(connectionId, code);
@@ -85,7 +113,10 @@ public class GameService
     }
 
     // ----------------------------------------------------------------- entrar
-    public async Task<object> JoinRoomAsync(string connectionId, string code, string name)
+    // A identidade do jogador é o TOKEN (estável no cliente), nunca o nome nem o connectionId
+    // (que muda a cada reconexão). Isso evita: dois jogadores com o mesmo connectionId,
+    // e alguém sequestrar o slot alheio só usando o mesmo nome.
+    public async Task<object> JoinRoomAsync(string connectionId, string code, string name, string token)
     {
         code = (code ?? "").Trim().ToUpperInvariant();
         if (!_rooms.TryGetValue(code, out var room))
@@ -94,28 +125,60 @@ public class GameService
         name = (name ?? "").Trim();
         if (name.Length == 0) return new { ok = false, error = "Digite um nome." };
         if (name.Length > 20) name = name[..20];
+        token = SanitizeToken(token);
 
         lock (room.Sync)
         {
-            // reconexão pelo mesmo nome reaproveita o slot
-            var existing = room.Players.FirstOrDefault(p =>
-                string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (existing != null)
+            // 1) já conheço este token? é reconexão/re-entrada: reamarra ao novo connectionId
+            var mine = token.Length > 0
+                ? room.Players.FirstOrDefault(p => p.Token == token)
+                : null;
+            if (mine != null)
             {
-                existing.Id = connectionId;
-                existing.Connected = true;
+                mine.Id = connectionId;
+                mine.Connected = true;
+                if (room.HostToken == token) room.HostConnectionId = connectionId;
             }
             else
             {
-                if (room.Phase != GamePhase.Lobby)
-                    return new { ok = false, error = "A partida já começou." };
-                room.Players.Add(new Player { Id = connectionId, Name = name });
+                // 2) esta conexão já ocupa outro slot? (era o bug de "2 jogadores, 1 ID")
+                if (room.Players.Any(p => p.Id == connectionId))
+                    return new { ok = false, error = "Esta conexão já está na sala." };
+
+                var sameName = room.Players.FirstOrDefault(p =>
+                    string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+
+                if (sameName != null)
+                {
+                    // 3) nome ocupado por alguém ONLINE: barra (antes isso sequestrava o slot)
+                    if (sameName.Connected)
+                        return new { ok = false, error = "Já tem alguém com esse nome na sala." };
+
+                    // 4) jogador offline: deixa reassumir o próprio slot (perdeu o token, trocou de aba)
+                    var oldToken = sameName.Token;
+                    sameName.Id = connectionId;
+                    sameName.Token = token;
+                    sameName.Connected = true;
+                    if (room.HostToken == oldToken) { room.HostToken = token; room.HostConnectionId = connectionId; }
+                }
+                else
+                {
+                    if (room.Phase != GamePhase.Lobby)
+                        return new { ok = false, error = "A partida já começou." };
+                    room.Players.Add(new Player { Id = connectionId, Token = token, Name = name });
+                }
             }
         }
 
         await _hub.Groups.AddToGroupAsync(connectionId, code);
         await BroadcastStateAsync(room);
         return new { ok = true, code, playerId = connectionId };
+    }
+
+    private static string SanitizeToken(string? t)
+    {
+        t = (t ?? "").Trim();
+        return t.Length > 64 ? t[..64] : t;
     }
 
     // ----------------------------------------------------------------- escolher país
@@ -702,6 +765,7 @@ public class GameService
 
         lock (room.Sync)
         {
+            room.LastActivityUtc = DateTime.UtcNow;   // sala viva (usado pela limpeza)
             var taken = room.Players.Where(p => p.CountryId != null)
                                     .Select(p => p.CountryId!)
                                     .ToHashSet(StringComparer.OrdinalIgnoreCase);

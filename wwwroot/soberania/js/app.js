@@ -4,9 +4,24 @@ const conn = new signalR.HubConnectionBuilder()
   .withAutomaticReconnect()
   .build();
 
+// ---------- identidade estável ----------
+// O connectionId muda a cada reconexão, então ele NÃO pode identificar o jogador.
+// Guardamos um token por aba (sessionStorage: cada aba = um jogador; sobrevive a F5).
+const myToken = (() => {
+  const KEY = "soberania.token";
+  let t = null;
+  try { t = sessionStorage.getItem(KEY); } catch { /* modo privado */ }
+  if (!t) {
+    t = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now());
+    try { sessionStorage.setItem(KEY, t); } catch { /* ignora */ }
+  }
+  return t;
+})();
+
 // ---------- estado local ----------
 let myId = null;
 let myCode = null;
+let myName = null;
 let myTitle = "Presidente";
 let lastState = null;
 
@@ -68,8 +83,9 @@ function showView(name) {
 $("createBtn").onclick = async () => {
   const name = $("nameInput").value.trim();
   if (!name) return homeError("Digite seu nome.");
-  const r = await conn.invoke("CreateRoom", name);
+  const r = await conn.invoke("CreateRoom", name, myToken);
   if (!r.ok) return homeError(r.error);
+  myName = name;
   setIdentity(r);
 };
 
@@ -78,8 +94,9 @@ $("joinBtn").onclick = async () => {
   const code = $("codeInput").value.trim().toUpperCase();
   if (!name) return homeError("Digite seu nome.");
   if (!code) return homeError("Digite o código da sala.");
-  const r = await conn.invoke("JoinRoom", code, name);
+  const r = await conn.invoke("JoinRoom", code, name, myToken);
   if (!r.ok) return homeError(r.error);
+  myName = name;
   setIdentity(r);
 };
 
@@ -632,5 +649,18 @@ $("sendProposalBtn").onclick = async () => {
 };
 
 // ---------- conexão ----------
-conn.onreconnected(() => { if (myCode) toast("Reconectado."); });
+// Ao reconectar, o SignalR entrega um connectionId NOVO e a conexão sai do grupo da sala.
+// Sem re-entrar, o jogador vira órfão: o servidor guarda o ID morto e param de chegar os "state".
+// O token faz o servidor reamarrar o slot existente em vez de criar outro jogador.
+conn.onreconnected(async () => {
+  if (!myCode || !myName) return;
+  try {
+    const r = await conn.invoke("JoinRoom", myCode, myName, myToken);
+    if (r && r.ok) { setIdentity(r); toast("Reconectado."); }
+    else toast("Reconectado, mas não deu para voltar à sala: " + ((r && r.error) || ""));
+  } catch (e) {
+    console.error(e);
+    toast("Falha ao voltar para a sala.");
+  }
+});
 conn.start().catch((e) => { console.error(e); toast("Falha ao conectar."); });

@@ -10,11 +10,11 @@ public class GameHub : Hub
     public GameHub(GameService game) => _game = game;
 
     // cria a sala; quem cria já entra como jogador (e vira host)
-    public Task<object> CreateRoom(string name) =>
-        _game.CreateRoomAsync(Context.ConnectionId, name);
+    public Task<object> CreateRoom(string name, string token) =>
+        _game.CreateRoomAsync(Context.ConnectionId, name, token);
 
-    public Task<object> JoinRoom(string code, string name) =>
-        _game.JoinRoomAsync(Context.ConnectionId, code, name);
+    public Task<object> JoinRoom(string code, string name, string token) =>
+        _game.JoinRoomAsync(Context.ConnectionId, code, name, token);
 
     public Task ChooseCountry(string code, string countryId, string title) =>
         _game.ChooseCountryAsync(Context.ConnectionId, code, countryId, title);
