@@ -59,6 +59,104 @@ public class GameService
                 Descricao = "Derruba a Relação Restrita que alguém tenha com esse NPC.", Custo = new() { Dinheiro = 400 } },
     };
 
+    // ----------------------------------------------------------------- aplicações financeiras
+    // Risco x retorno: quanto mais rende, maior a chance de quebrar. A credibilidade e a
+    // satisfação do país ajustam a taxa — quem tem nome bom capta melhor.
+    private static readonly List<InvestmentDef> Investimentos = new()
+    {
+        new() { Id = "suica", Nome = "Títulos Suíços", Emoji = "🏦", Origem = "🇨🇭 Suíça",
+                RendimentoPct = 4, RiscoPct = 3, PerdaSeQuebrarPct = 20, PrazoMin = 2, PrazoMax = 6,
+                Descricao = "Porto seguro: rende pouco, quase nunca quebra." },
+        new() { Id = "catar", Nome = "Fundo Soberano", Emoji = "🏗️", Origem = "🇶🇦 Catar",
+                RendimentoPct = 9, RiscoPct = 15, PerdaSeQuebrarPct = 40, PrazoMin = 2, PrazoMax = 5,
+                Descricao = "Petrodólares aplicados em infraestrutura." },
+        new() { Id = "ucrania", Nome = "Agronegócio", Emoji = "🌻", Origem = "🇺🇦 Ucrânia",
+                RendimentoPct = 13, RiscoPct = 28, PerdaSeQuebrarPct = 50, PrazoMin = 1, PrazoMax = 4,
+                Descricao = "Safra farta paga bem, mas depende de estabilidade." },
+        new() { Id = "venezuela", Nome = "Petro-bônus", Emoji = "🛢️", Origem = "🇻🇪 Venezuela",
+                RendimentoPct = 20, RiscoPct = 45, PerdaSeQuebrarPct = 70, PrazoMin = 1, PrazoMax = 3,
+                Descricao = "Rendimento altíssimo. Pode virar pó." },
+        new() { Id = "interno", Nome = "Tesouro Nacional", Emoji = "🏛️", Origem = "seu próprio país",
+                RendimentoPct = 7, RiscoPct = 10, PerdaSeQuebrarPct = 35, PrazoMin = 1, PrazoMax = 6,
+                Descricao = "Aplica em casa: sua credibilidade e satisfação pesam MAIS aqui." },
+    };
+
+    private const int PrazoMaximoRodadas = 6;
+
+    /// <summary>Taxa efetiva: credibilidade e satisfação melhoram (ou estragam) o rendimento.</summary>
+    private static int RendimentoEfetivo(InvestmentDef def, Player p)
+    {
+        // credibilidade acima de 50 soma; abaixo, subtrai. Satisfação pesa menos.
+        int bonusCred = (p.Stats.Credibilidade - CredibilidadeNeutra) / 10;
+        int bonusSatisf = p.Stats.Satisfacao / 40;
+        if (def.Id == "interno") { bonusCred *= 2; bonusSatisf *= 2; }   // no tesouro interno pesa dobrado
+        return Math.Max(0, def.RendimentoPct + bonusCred + bonusSatisf);
+    }
+
+    public async Task<object> InvestAsync(string connectionId, string code, string defId, int valor, int rodadas)
+    {
+        if (!_rooms.TryGetValue(code, out var room)) return Fail("Sala não encontrada.");
+        int taxaAplicada, prazoAplicado;
+
+        lock (room.Sync)
+        {
+            if (room.Phase != GamePhase.Investimento) return Fail("Só dá para aplicar na fase de Investimento.");
+
+            var p = room.Players.FirstOrDefault(x => x.Id == connectionId);
+            if (p == null || !p.ChoseCountry || p.Deposto) return Fail("Você não pode aplicar.");
+
+            var def = Investimentos.FirstOrDefault(d => d.Id == defId);
+            if (def == null) return Fail("Aplicação inválida.");
+
+            if (valor <= 0) return Fail("Informe um valor.");
+            if (p.Cofre.Dinheiro < valor) return Fail($"Você só tem {p.Cofre.Dinheiro} 💰.");
+            rodadas = Math.Clamp(rodadas, def.PrazoMin, Math.Min(def.PrazoMax, PrazoMaximoRodadas));
+
+            var taxa = RendimentoEfetivo(def, p);
+            p.Cofre.Dinheiro -= valor;                       // dinheiro fica travado
+            p.Aplicacoes.Add(new Investment
+            {
+                DefId = def.Id, Valor = valor,
+                RodadasRestantes = rodadas, PrazoTotal = rodadas, RendimentoTravadoPct = taxa
+            });
+            taxaAplicada = taxa; prazoAplicado = rodadas;
+        }
+
+        await BroadcastStateAsync(room);
+        return new { ok = true, taxa = taxaAplicada, rodadas = prazoAplicado };
+    }
+
+    /// <summary>Roda no Resultados: conta o prazo, paga o que venceu e sorteia o risco.</summary>
+    private static void LiquidaAplicacoes(Room room, Player p)
+    {
+        foreach (var ap in p.Aplicacoes.ToList())
+        {
+            ap.RodadasRestantes--;
+            if (ap.RodadasRestantes > 0) continue;
+
+            var def = Investimentos.FirstOrDefault(d => d.Id == ap.DefId);
+            if (def == null) { p.Aplicacoes.Remove(ap); continue; }
+
+            // juros compostos simplificados: principal * (1 + taxa)^prazo
+            double montante = ap.Valor;
+            for (int i = 0; i < ap.PrazoTotal; i++) montante *= 1 + ap.RendimentoTravadoPct / 100.0;
+            int total = (int)Math.Round(montante);
+
+            if (_rng.Next(100) < def.RiscoPct)
+            {
+                int devolvido = ap.Valor * (100 - def.PerdaSeQuebrarPct) / 100;
+                p.Cofre.Dinheiro += devolvido;
+                p.LastResults.Add($"📉 {def.Emoji} {def.Nome} QUEBROU! Você aplicou {ap.Valor} e recuperou só {devolvido} 💰.");
+            }
+            else
+            {
+                p.Cofre.Dinheiro += total;
+                p.LastResults.Add($"📈 {def.Emoji} {def.Nome} venceu: {ap.Valor} 💰 viraram {total} (+{total - ap.Valor}) a {ap.RendimentoTravadoPct}%/rodada.");
+            }
+            p.Aplicacoes.Remove(ap);
+        }
+    }
+
     // ----------------------------------------------------------------- Relação Restrita (com NPC)
     // Acordo caro e exclusivo: o dono compra o NPC "para si" e o que aquele NPC exige
     // fica MAIS CARO para todos os outros jogadores.
@@ -746,10 +844,13 @@ public class GameService
     private const int DefameSelfCredCost = 4;        // difamar suja também quem difama (alvo perde 10)
     private const int ContagioCredibilidadePct = 50; // parceiro comercial absorve 50% da queda alheia
 
-    // evasão (gente indo embora)
+    // saldo migratório: positivo = gente chegando, negativo = evasão
+    private const int CredibilidadeNeutra = 50;      // acima disso o país atrai; abaixo, empurra
+    private const int CredPorPctMigracao = 10;       // cada 10 pontos de credibilidade = 1% de migração
+    private const int SatisfacaoPorPctMigracao = 20; // cada 20 pontos de satisfação = 1% de migração
     private const int FomeDeficitPorPctPop = 2;      // cada 2 de déficit de comida = 1% de fuga
-    private const int SatisfacaoPorPctEvasao = 10;   // cada 10 pontos de satisfação NEGATIVA = 1% de fuga
-    private const int EvasaoTetoPct = 30;            // teto de 30% da população por rodada
+    private const int EvasaoTetoPct = 30;            // teto de fuga por rodada
+    private const int ImigracaoTetoPct = 10;         // teto de entrada por rodada
     private const int FomeDeficitPorCred = 5;        // cada 5 de déficit = -1 credibilidade
     private const int FomeCredTeto = 20;
 
@@ -851,12 +952,9 @@ public class GameService
                 ? $"💰 Impostos: +{imposto} (população {s.Populacao}mi × satisfação {s.Satisfacao}%)."
                 : $"💰 Impostos: +0 — com satisfação em {s.Satisfacao}% o povo não paga imposto.");
 
-            int crescimento = s.Credibilidade / 25;
-            if (crescimento > 0)
-            {
-                s.Populacao += crescimento;
-                p.LastResults.Add($"👥 População cresceu +{crescimento}mi (credibilidade {s.Credibilidade}).");
-            }
+            // aplicações que venceram voltam com rendimento (ou quebram)
+            LiquidaAplicacoes(room, p);
+            // (o crescimento populacional agora está no saldo migratório, mais abaixo)
         }
 
         // 2) efeitos contínuos (peste global atinge todos os ativos)
@@ -895,16 +993,15 @@ public class GameService
             to.LastResults.Add($"🤝 Relação com {LabelFor(room, from)}: você deu {Descrever(rel.ToGives)} e recebeu {Descrever(rel.FromGives)}.");
         }
 
-        // 3b) EVASÃO: gente indo embora. Duas causas somam — passar fome e viver infeliz.
+        // 3b) SALDO MIGRATÓRIO: credibilidade e satisfação atraem ou empurram; fome só empurra.
+        // Positivo = gente chegando. Negativo = evasão.
         foreach (var p in ativos)
         {
             var s = p.Stats;
-            int pctFome = 0, pctInfeliz = 0;
             int deficit = p.Cofre.Alimento < 0 ? -p.Cofre.Alimento : 0;
 
             if (deficit > 0)
             {
-                pctFome = deficit / FomeDeficitPorPctPop;
                 int perdaCred = Math.Min(FomeCredTeto, deficit / FomeDeficitPorCred);
                 if (perdaCred > 0)
                 {
@@ -913,18 +1010,27 @@ public class GameService
                 }
             }
 
-            // satisfação negativa: cada 10 pontos abaixo de zero = 1% de fuga
-            if (s.Satisfacao < 0) pctInfeliz = (-s.Satisfacao) / SatisfacaoPorPctEvasao;
+            // credibilidade alta atrai imigrante; baixa faz o povo procurar outro lugar
+            int pctCred = (s.Credibilidade - CredibilidadeNeutra) / CredPorPctMigracao;
+            int pctSatisf = s.Satisfacao / SatisfacaoPorPctMigracao;      // negativo empurra sozinho
+            int pctFome = -(deficit / FomeDeficitPorPctPop);
 
-            int pct = Math.Min(EvasaoTetoPct, pctFome + pctInfeliz);
-            s.EvasaoPct = pct;
-            if (pct <= 0) continue;
+            int saldo = Math.Clamp(pctCred + pctSatisf + pctFome, -EvasaoTetoPct, ImigracaoTetoPct);
+            s.EvasaoPct = saldo;
+            if (saldo == 0) { p.LastResults.Add("🧳 Migração estável: ninguém entrou nem saiu."); continue; }
 
-            int foram = Perda(s.Populacao, pct);
-            s.Populacao -= foram;
-            var causa = pctFome > 0 && pctInfeliz > 0 ? "fome e revolta"
-                      : (pctFome > 0 ? "fome" : "revolta popular");
-            p.LastResults.Add($"🧳 Evasão de {pct}% por {causa}: {foram}mi de pessoas deixaram o país.");
+            int pessoas = Perda(s.Populacao, Math.Abs(saldo));
+            if (saldo > 0)
+            {
+                s.Populacao += pessoas;
+                p.LastResults.Add($"🧳 Imigração de +{saldo}% (credibilidade {s.Credibilidade}, satisfação {s.Satisfacao}%): +{pessoas}mi de pessoas.");
+            }
+            else
+            {
+                s.Populacao -= pessoas;
+                var causa = deficit > 0 ? "fome, " : "";
+                p.LastResults.Add($"🧳 Evasão de {saldo}% ({causa}credibilidade {s.Credibilidade}, satisfação {s.Satisfacao}%): {pessoas}mi deixaram o país.");
+            }
         }
 
         // 3c) GUERRA CIVIL: credibilidade baixa é o gatilho; militar fraco agrava.
@@ -1235,6 +1341,19 @@ public class GameService
                             mao = eu ? p.Mao.Select(h => CardDto(h)).ToList() : null,
                             // ofertas do Investimento só para o próprio dono
                             ofertas = eu ? p.Ofertas.Select(h => CardDto(h, p.Cofre)).ToList() : null,
+                            // aplicações: o dono vê os detalhes; os outros só o total travado
+                            aplicacoesCount = p.Aplicacoes.Count,
+                            aplicacoes = eu ? p.Aplicacoes.Select(a =>
+                            {
+                                var d = Investimentos.FirstOrDefault(x => x.Id == a.DefId);
+                                return new
+                                {
+                                    id = a.Id, nome = d?.Nome ?? a.DefId, emoji = d?.Emoji, origem = d?.Origem,
+                                    valor = a.Valor, taxa = a.RendimentoTravadoPct,
+                                    rodadasRestantes = a.RodadasRestantes, prazoTotal = a.PrazoTotal,
+                                    risco = d?.RiscoPct ?? 0
+                                };
+                            }).ToList() : null,
                             lastResults = (eu || revelaTudo) ? p.LastResults.ToList() : null
                         };
                     }).ToList(),
@@ -1245,6 +1364,15 @@ public class GameService
                         emoji = c.Emoji,
                         taken = taken.Contains(c.Id),
                         inicial = CofreDto(c.Inicial)
+                    }).ToList(),
+                    // catálogo de aplicações, com a taxa JÁ ajustada para este jogador
+                    investimentos = Investimentos.Select(d => new
+                    {
+                        id = d.Id, nome = d.Nome, emoji = d.Emoji, origem = d.Origem,
+                        descricao = d.Descricao, rendimentoBase = d.RendimentoPct,
+                        rendimentoEfetivo = RendimentoEfetivo(d, viewer),
+                        risco = d.RiscoPct, perdaSeQuebrar = d.PerdaSeQuebrarPct,
+                        prazoMin = d.PrazoMin, prazoMax = d.PrazoMax
                     }).ToList(),
                     npcs = Npcs.Select(n =>
                     {

@@ -59,7 +59,7 @@ const STATS = [
   { key: "populacao", label: "População", emoji: "👥" },
   { key: "credibilidade", label: "Credibilidade", emoji: "🎖️" },
   { key: "satisfacao", label: "Satisfação", emoji: "😀" },
-  { key: "evasao", label: "Evasão", emoji: "🧳" },
+  { key: "evasao", label: "Migração", emoji: "🧳" },
 ];
 
 // ---------- helpers de DOM ----------
@@ -288,10 +288,10 @@ function statsHtml(stats) {
   if (!stats) return "";
   return STATS.map((st) => {
     const v = stats[st.key] ?? 0;
-    // satisfação vai de -100% a +100%: negativo é povo revoltado (perto de -50% cai o líder)
-    const low = (st.key === "satisfacao" && v < 0) || (st.key === "evasao" && v > 0);
+    // satisfação (-100..+100) e migração (saldo) vão a negativo; negativo é sinal de encrenca
+    const low = (st.key === "satisfacao" || st.key === "evasao") && v < 0;
     const suffix = st.key === "populacao" ? "mi" : "%";
-    const sinal = st.key === "satisfacao" && v > 0 ? "+" : "";
+    const sinal = (st.key === "satisfacao" || st.key === "evasao") && v > 0 ? "+" : "";
     return `
     <div class="stat ${low ? "low" : ""}">
       <div class="slabel">${st.emoji} ${st.label}</div>
@@ -329,7 +329,101 @@ function cardHtml(c, mode) {
     </div>`;
 }
 
+// ---------- aplicações financeiras ----------
+let abaInvest = "cartas";
+$("tabCartas").onclick = () => { abaInvest = "cartas"; if (lastState) renderInvestimento(lastState); };
+$("tabAplicacoes").onclick = () => { abaInvest = "aplicacoes"; if (lastState) renderInvestimento(lastState); };
+$("imClose").onclick = () => hide($("investModal"));
+$("investModal").onclick = (e) => { if (e.target === $("investModal")) hide($("investModal")); };
+
+let investSelecionado = null;
+
+function projecao(valor, taxa, rodadas) {
+  let m = valor;
+  for (let i = 0; i < rodadas; i++) m *= 1 + taxa / 100;
+  return Math.round(m);
+}
+
+function atualizaPrevisao() {
+  if (!investSelecionado) return;
+  const v = Math.max(0, parseInt($("imValor").value, 10) || 0);
+  const r = Math.max(1, parseInt($("imRodadas").value, 10) || 1);
+  const bruto = projecao(v, investSelecionado.rendimentoEfetivo, r);
+  const seQuebrar = Math.round(v * (100 - investSelecionado.perdaSeQuebrar) / 100);
+  $("imPrevisao").innerHTML =
+    `Se der certo: <b class="ok">${bruto} 💰</b> (+${bruto - v}) · ` +
+    `Se quebrar (${investSelecionado.risco}% de chance): <b class="err">${seQuebrar} 💰</b>`;
+}
+$("imValor").oninput = atualizaPrevisao;
+$("imRodadas").oninput = atualizaPrevisao;
+
+function abrirModalInvest(def, saldo) {
+  investSelecionado = def;
+  $("imTitle").textContent = `${def.emoji} ${def.nome}`;
+  $("imSub").textContent = `${def.origem} · ${def.rendimentoEfetivo}% por rodada · risco ${def.risco}%`;
+  $("imSaldo").textContent = saldo;
+  $("imPrazoFaixa").textContent = `${def.prazoMin} a ${def.prazoMax} rodadas`;
+  $("imRodadas").min = def.prazoMin; $("imRodadas").max = def.prazoMax;
+  $("imRodadas").value = def.prazoMin;
+  $("imValor").max = saldo;
+  $("imValor").value = Math.min(100, saldo);
+  hide($("imErro"));
+  atualizaPrevisao();
+  show($("investModal"));
+}
+
+$("imConfirmar").onclick = async () => {
+  if (!investSelecionado) return;
+  const valor = parseInt($("imValor").value, 10) || 0;
+  const rodadas = parseInt($("imRodadas").value, 10) || 1;
+  const r = await conn.invoke("Invest", myCode, investSelecionado.id, valor, rodadas);
+  if (!r.ok) { const e = $("imErro"); e.textContent = r.error; show(e); return; }
+  hide($("investModal"));
+  toast(`Aplicado! ${valor} 💰 a ${r.taxa}%/rodada por ${r.rodadas} rodada(s).`);
+};
+
+function renderAplicacoes(s) {
+  const mine = me(s);
+  const saldo = (mine && mine.cofre) ? mine.cofre.dinheiro : 0;
+
+  $("investOptions").innerHTML = (s.investimentos || []).map((d) => {
+    const delta = d.rendimentoEfetivo - d.rendimentoBase;
+    const ajuste = delta === 0 ? "" :
+      `<span class="${delta > 0 ? "ok" : "err"}"> (${delta > 0 ? "+" : ""}${delta} pelo seu país)</span>`;
+    return `
+      <div class="card invest">
+        <div class="chead"><span class="cemoji">${d.emoji}</span><span class="cnome">${d.nome}</span>
+          <span class="calvo risco-${d.risco >= 40 ? "alto" : (d.risco >= 15 ? "medio" : "baixo")}">risco ${d.risco}%</span></div>
+        <div class="cdesc">${d.descricao}</div>
+        <div class="ccusto"><span class="lbl">Origem:</span> ${d.origem}</div>
+        <div class="ccusto"><span class="lbl">Rende:</span> <b>${d.rendimentoEfetivo}%</b>/rodada${ajuste}</div>
+        <div class="ccusto"><span class="lbl">Prazo:</span> ${d.prazoMin}–${d.prazoMax} rodadas</div>
+        <button class="btn primary small" data-invest="${d.id}">Aplicar</button>
+      </div>`;
+  }).join("") || '<div class="empty-note">Nenhuma aplicação disponível.</div>';
+
+  $("investOptions").querySelectorAll("button[data-invest]").forEach((b) =>
+    b.onclick = () => abrirModalInvest(s.investimentos.find((d) => d.id === b.dataset.invest), saldo));
+
+  const ativas = (mine && mine.aplicacoes) || [];
+  $("investAtivas").innerHTML = ativas.length ? ativas.map((a) => `
+    <div class="prop">
+      <div class="phead"><span>${a.emoji ?? "💹"}</span><span class="pwho">${a.nome}</span>
+        <span class="badge">${a.rodadasRestantes}/${a.prazoTotal} rodadas</span></div>
+      <div class="pterms">${a.valor} 💰 aplicados a <b>${a.taxa}%</b>/rodada · risco ${a.risco}%
+        · projeção: <b class="ok">${projecao(a.valor, a.taxa, a.prazoTotal)} 💰</b></div>
+    </div>`).join("")
+    : '<div class="empty-note">Nenhuma aplicação em andamento.</div>';
+}
+
 function renderInvestimento(s) {
+  // abas: cartas x aplicações
+  const emCartas = abaInvest === "cartas";
+  $("tabCartas").classList.toggle("active", emCartas);
+  $("tabAplicacoes").classList.toggle("active", !emCartas);
+  if (emCartas) { show($("invCartas")); hide($("invAplicacoes")); }
+  else { hide($("invCartas")); show($("invAplicacoes")); renderAplicacoes(s); }
+
   const mine = me(s);
   const offers = (mine && mine.ofertas) || [];
   const oc = $("offerCards");

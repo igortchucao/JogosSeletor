@@ -40,6 +40,10 @@ public class GameHub : Hub
     public Task BuyCard(string code, string offerId) =>
         _game.BuyCardAsync(Context.ConnectionId, code, offerId);
 
+    // aplica dinheiro: rende por rodada até vencer, com risco de quebrar
+    public Task<object> Invest(string code, string defId, int valor, int rodadas) =>
+        _game.InvestAsync(Context.ConnectionId, code, defId, valor, rodadas);
+
     // ------- Ações -------
     public Task<object> PlayCard(string code, string handCardId, string? targetId) =>
         _game.PlayCardAsync(Context.ConnectionId, code, handCardId, targetId);

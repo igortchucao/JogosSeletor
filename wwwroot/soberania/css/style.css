@@ -313,6 +313,12 @@ h4 { margin: 16px 0 6px; font-size: 13px; color: var(--muted); }
 .btn.restrita { background: #4b2e83; border-color: #6b46c1; color: #fff; }
 .card .calvo.Npc { background: #6b46c1; color: #fff; }
 
+/* aplicações financeiras */
+.card.invest { border-color: var(--line); }
+.card .calvo.risco-baixo { background: var(--ok); color: #052e22; }
+.card .calvo.risco-medio { background: var(--accent2); color: #1a1200; }
+.card .calvo.risco-alto  { background: var(--danger); color: #fff; }
+
 .card .playbtn { margin-top: 4px; }
 .card.hand.playable { border-color: var(--accent2); }
 

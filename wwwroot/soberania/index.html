@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Soberania</title>
-<link rel="stylesheet" href="css/style.css?v=11" />
+<link rel="stylesheet" href="css/style.css?v=12" />
 </head>
 <body>
   <header class="topbar">
@@ -107,10 +107,50 @@
 
       <!-- INVESTIMENTO -->
       <div id="invPanel" class="pad" hidden>
-        <h3>Cartas do turno — compre as que puder pagar</h3>
-        <div id="offerCards" class="cards"></div>
-        <h3>Sua mão (<span id="handCount">0</span>) — jogadas na fase de Ações</h3>
-        <div id="handCards" class="cards"></div>
+        <div class="res-tabs" role="tablist">
+          <button class="res-tab active" id="tabCartas" role="tab">🃏 Cartas</button>
+          <button class="res-tab" id="tabAplicacoes" role="tab">💹 Aplicações</button>
+        </div>
+
+        <div id="invCartas">
+          <h3>Cartas do turno — compre as que puder pagar</h3>
+          <div id="offerCards" class="cards"></div>
+          <h3>Sua mão (<span id="handCount">0</span>) — jogadas na fase de Ações</h3>
+          <div id="handCards" class="cards"></div>
+        </div>
+
+        <div id="invAplicacoes" hidden>
+          <h3>Onde aplicar seu dinheiro</h3>
+          <p class="tiny muted">O dinheiro fica travado até vencer. Sua credibilidade e satisfação ajustam a taxa.</p>
+          <div id="investOptions" class="cards"></div>
+
+          <h3>Aplicações em andamento</h3>
+          <div id="investAtivas" class="prop-list"></div>
+        </div>
+      </div>
+
+      <!-- MODAL DE APLICAÇÃO -->
+      <div id="investModal" class="modal-backdrop" hidden>
+        <div class="modal">
+          <div class="modal-head">
+            <div>
+              <div class="modal-title" id="imTitle">Aplicar</div>
+              <div class="modal-sub tiny muted" id="imSub"></div>
+            </div>
+            <button class="modal-x" id="imClose" aria-label="Fechar">✕</button>
+          </div>
+          <label class="field">
+            <span>Quanto aplicar (disponível: <b id="imSaldo">0</b> 💰)</span>
+            <input id="imValor" type="number" min="1" value="100" inputmode="numeric" />
+          </label>
+          <label class="field">
+            <span>Por quantas rodadas (<span id="imPrazoFaixa"></span>)</span>
+            <input id="imRodadas" type="number" min="1" value="2" inputmode="numeric" />
+          </label>
+          <p id="imPrevisao" class="tiny"></p>
+          <button id="imConfirmar" class="btn primary big">Aplicar</button>
+          <p id="imErro" class="tiny err" hidden></p>
+        </div>
       </div>
 
       <!-- AÇÕES / REPRESÁLIAS -->
@@ -192,6 +232,6 @@
   <footer class="foot tiny" id="foot"></footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
-  <script src="js/app.js?v=11"></script>
+  <script src="js/app.js?v=12"></script>
 </body>
 </html>

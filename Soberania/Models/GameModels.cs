@@ -114,6 +114,35 @@ public class CardDef
     public string Efeito { get; set; } = "";       // chave interpretada na fase de Ações (depois)
 }
 
+/// <summary>
+/// Opção de aplicação financeira (catálogo fixo). Cada uma tem rendimento, risco e país de origem.
+/// O rendimento efetivo ainda é ajustado pela credibilidade e satisfação de quem aplica.
+/// </summary>
+public class InvestmentDef
+{
+    public string Id { get; set; } = "";
+    public string Nome { get; set; } = "";
+    public string Emoji { get; set; } = "";
+    public string Origem { get; set; } = "";        // país de origem (sabor + tema)
+    public int RendimentoPct { get; set; }           // % por rodada sobre o valor aplicado
+    public int RiscoPct { get; set; }                // chance de dar errado no vencimento
+    public int PerdaSeQuebrarPct { get; set; }       // quanto do principal se perde se der errado
+    public int PrazoMin { get; set; } = 1;
+    public int PrazoMax { get; set; } = 5;
+    public string Descricao { get; set; } = "";
+}
+
+/// <summary>Aplicação ativa de um jogador: dinheiro travado até vencer.</summary>
+public class Investment
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string DefId { get; set; } = "";
+    public int Valor { get; set; }                   // principal aplicado
+    public int RodadasRestantes { get; set; }
+    public int PrazoTotal { get; set; }
+    public int RendimentoTravadoPct { get; set; }    // taxa efetiva no momento da aplicação
+}
+
 /// <summary>Instância de carta que um jogador possui (oferta no Investimento ou carta na mão).</summary>
 public class HeldCard
 {
@@ -246,6 +275,9 @@ public class Player
     // Investimento: 3 cartas ofertadas no turno e a mão comprada
     public List<HeldCard> Ofertas { get; } = new();
     public List<HeldCard> Mao { get; } = new();
+
+    // aplicações financeiras em andamento (dinheiro travado rendendo)
+    public List<Investment> Aplicacoes { get; } = new();
 
     // Resultados: linhas do que mudou no último cálculo
     public List<string> LastResults { get; } = new();
