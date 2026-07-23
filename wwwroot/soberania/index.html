@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Soberania</title>
-<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/style.css?v=9" />
 </head>
 <body>
   <header class="topbar">
@@ -61,6 +61,7 @@
     <section id="gameView" class="view" hidden>
       <div class="round-bar">
         <span>Rodada <strong id="roundNum">1</strong></span>
+        <span class="timer" id="phaseTimer">--:--</span>
         <div class="phase-steps" id="phaseSteps"></div>
       </div>
 
@@ -92,6 +93,7 @@
             </div>
           </div>
           <button id="sendProposalBtn" class="btn primary big">Enviar proposta</button>
+          <button id="restritaBtn" class="btn small restrita" hidden>🔒 Relação Restrita</button>
           <button id="cancelTargetBtn" class="btn small ghost">Trocar de alvo</button>
           <p id="negMsg" class="tiny" hidden></p>
         </div>
@@ -117,18 +119,11 @@
         <div id="ongoingBanner" class="ongoing-banner warn" hidden></div>
 
         <div id="acoesTools">
-          <h3>Sua mão — jogue as cartas</h3>
-          <div id="acaoHand" class="cards"></div>
+          <h3>Ações sempre disponíveis</h3>
+          <div id="acaoFixas" class="cards"></div>
 
-          <h3>Agir contra uma nação</h3>
-          <label class="field">
-            <span>Alvo</span>
-            <select id="actTarget" class="sel-input"></select>
-          </label>
-          <div class="act-buttons">
-            <button id="btnAtacar" class="btn danger small">⚔️ Atacar militarmente</button>
-            <button id="btnDifamar" class="btn small">📢 Difamar (150 💰)</button>
-          </div>
+          <h3>Sua mão — cartas compradas</h3>
+          <div id="acaoHand" class="cards"></div>
 
           <div id="relCreate">
             <h4>Criar relação comercial (vale todo turno até cortar)</h4>
@@ -136,7 +131,7 @@
               <div><div class="tb-label give">Você dá / rodada</div><div id="relGiveInputs" class="res-inputs"></div></div>
               <div><div class="tb-label get">Você recebe / rodada</div><div id="relGetInputs" class="res-inputs"></div></div>
             </div>
-            <button id="btnCriarRel" class="btn primary small">Propor relação ao alvo</button>
+            <button id="btnCriarRel" class="btn primary small">Escolher parceiro e propor</button>
           </div>
         </div>
 
@@ -152,6 +147,11 @@
       <!-- RESULTADOS -->
       <div id="resPanel" class="pad" hidden>
         <div id="resOngoing" class="ongoing-banner warn" hidden></div>
+
+        <h3>Evolução das nações</h3>
+        <div id="resTabs" class="res-tabs" role="tablist"></div>
+        <div id="resCharts" class="res-charts"></div>
+
         <h3>Resultados da rodada</h3>
         <div id="resultsList" class="results-list"></div>
       </div>
@@ -165,10 +165,25 @@
         <div id="nations" class="nations"></div>
       </div>
 
-      <div class="host-controls pad" id="hostControls" hidden>
-        <button id="nextBtn" class="btn primary big">Avançar fase ▶</button>
+      <div class="host-controls pad" id="readyBar">
+        <button id="readyBtn" class="btn primary big">✅ Estou pronto</button>
+        <p id="readyHint" class="tiny muted"></p>
       </div>
     </section>
+
+    <!-- MODAL DE ALVO -->
+    <div id="targetModal" class="modal-backdrop" hidden>
+      <div class="modal">
+        <div class="modal-head">
+          <div>
+            <div class="modal-title" id="modalTitle">Escolher alvo</div>
+            <div class="modal-sub tiny muted" id="modalSub"></div>
+          </div>
+          <button class="modal-x" id="modalClose" aria-label="Fechar">✕</button>
+        </div>
+        <div id="modalTargets" class="targets"></div>
+      </div>
+    </div>
 
     <div id="toast" class="toast" hidden></div>
   </main>
@@ -176,6 +191,6 @@
   <footer class="foot tiny" id="foot"></footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=9"></script>
 </body>
 </html>

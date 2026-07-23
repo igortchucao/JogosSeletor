@@ -58,6 +58,17 @@ public class Cofre
     public bool IsEmpty =>
         Dinheiro == 0 && Terra == 0 && Petroleo == 0 && Alimento == 0 && Militares == 0 && Divida == 0;
 
+    /// <summary>Devolve uma cópia com todos os recursos escalados por uma porcentagem (ex.: 160 = +60%).</summary>
+    public Cofre Scale(int pct) => new()
+    {
+        Dinheiro  = Dinheiro  * pct / 100,
+        Terra     = Terra     * pct / 100,
+        Petroleo  = Petroleo  * pct / 100,
+        Alimento  = Alimento  * pct / 100,
+        Militares = Militares * pct / 100,
+        Divida    = Divida    * pct / 100,
+    };
+
     /// <summary>Todo recurso de A é &gt;= ao de B (usado nas regras do NPC).</summary>
     public bool CobreOuIgual(Cofre b) =>
         Dinheiro >= b.Dinheiro && Terra >= b.Terra && Petroleo >= b.Petroleo &&
@@ -152,6 +163,17 @@ public class Proposal
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 }
 
+/// <summary>
+/// Estado MUTÁVEL de um NPC dentro de UMA sala (o catálogo `Npcs` é fixo e compartilhado,
+/// então nada que muda durante a partida pode morar lá).
+/// </summary>
+public class NpcState
+{
+    public int BloqueioRoundsLeft { get; set; }        // sabotado: para de vender por N rodadas
+    public bool Bloqueado => BloqueioRoundsLeft > 0;
+    public string? RestritaOwnerId { get; set; }        // dono da Relação Restrita (encarece p/ os outros)
+}
+
 public enum RelationStatus { Pendente, Ativa }
 
 /// <summary>
@@ -221,8 +243,21 @@ public class Player
     // Resultados: linhas do que mudou no último cálculo
     public List<string> LastResults { get; } = new();
     public bool Deposto { get; set; }   // golpe: aprovação chegou a zero
+    public bool Ready { get; set; }     // marcou "pronto" na fase atual (zera a cada fase)
+
+    // histórico por rodada, para os gráficos da tela de Resultados
+    public List<Snapshot> History { get; } = new();
 
     public bool ChoseCountry => CountryId != null;
+}
+
+/// <summary>Foto do país ao fim de uma rodada — alimenta os gráficos de evolução.</summary>
+public class Snapshot
+{
+    public int Round { get; set; }
+    public int Dinheiro { get; set; }
+    public int Populacao { get; set; }
+    public int Aprovacao { get; set; }
 }
 
 public class Room
@@ -234,8 +269,13 @@ public class Room
     public GamePhase Phase { get; set; } = GamePhase.Lobby;
     public int Round { get; set; }             // 0 no lobby; começa em 1 ao iniciar o jogo
 
+    // a fase troca sozinha: quando todos ficam prontos OU quando o tempo acaba
+    public DateTime? PhaseDeadlineUtc { get; set; }
+    public Guid PhaseToken { get; set; }       // invalida o cronômetro de uma fase já superada
+
     public List<Proposal> Proposals { get; } = new();
     public List<Relation> Relations { get; } = new();
+    public Dictionary<string, NpcState> NpcStates { get; } = new();   // por NPC, só desta sala
     public List<OngoingEffect> Ongoing { get; } = new();
     public List<GameEvent> Events { get; } = new();
 

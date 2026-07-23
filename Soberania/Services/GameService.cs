@@ -51,7 +51,36 @@ public class GameService
                 Descricao = "Novas reservas: ganha petróleo.", Custo = new() { Dinheiro = 300, Terra = 20 } },
         new() { Id = "humanitaria", Nome = "Ajuda Humanitária",  Emoji = "🕊️", Alvo = "Inimigo", Efeito = "diplomacia",
                 Descricao = "Envia ajuda: sobe a credibilidade e aprovação do alvo (diplomacia).", Custo = new() { Dinheiro = 200, Alimento = 40 } },
+
+        // --- cartas contra países NPC (fornecedores) ---
+        new() { Id = "sabotagem",   Nome = "Sabotar Fornecedor", Emoji = "💣", Alvo = "Npc", Efeito = "bloqueia_npc",
+                Descricao = "Ataca um país NPC: ele para de vender por 2 rodadas.", Custo = new() { Dinheiro = 450, Militares = 25 } },
+        new() { Id = "contrabando", Nome = "Golpe Diplomático",  Emoji = "🕵️", Alvo = "Npc", Efeito = "quebra_restrita",
+                Descricao = "Derruba a Relação Restrita que alguém tenha com esse NPC.", Custo = new() { Dinheiro = 400 } },
     };
+
+    // ----------------------------------------------------------------- Relação Restrita (com NPC)
+    // Acordo caro e exclusivo: o dono compra o NPC "para si" e o que aquele NPC exige
+    // fica MAIS CARO para todos os outros jogadores.
+    private const int RestritaPrice = 1500;      // custo em dinheiro
+    private const int RestritaMarkupPct = 160;   // os outros pagam 160% do preço normal (+60%)
+    private const int SabotagemRounds = 2;
+
+    private static NpcState StateOf(Room room, string npcId)
+    {
+        if (!room.NpcStates.TryGetValue(npcId, out var st))
+            room.NpcStates[npcId] = st = new NpcState();
+        return st;
+    }
+
+    /// <summary>O que o NPC exige DESTE jogador (com ágio se outro dono detém a Relação Restrita).</summary>
+    private static Cofre QuerDe(Room room, Npc npc, string playerId)
+    {
+        var st = StateOf(room, npc.Id);
+        return (st.RestritaOwnerId != null && st.RestritaOwnerId != playerId)
+            ? npc.Quer.Scale(RestritaMarkupPct)
+            : npc.Quer;
+    }
 
     // ----------------------------------------------------------------- NPCs (oferta FIXA, igual em todo jogo)
     // Cada NPC entrega "Da" e exige "Quer". Aceita automaticamente se a proposta do jogador
@@ -214,6 +243,7 @@ public class GameService
     public async Task StartGameAsync(string connectionId, string code)
     {
         if (!_rooms.TryGetValue(code, out var room)) return;
+        Guid startedToken;
 
         lock (room.Sync)
         {
@@ -225,41 +255,113 @@ public class GameService
             if (actives.Any(p => !p.ChoseCountry)) return;       // todos precisam ter país
 
             room.Round = 1;
-            room.Phase = GamePhase.Negociacao;
             room.Proposals.Clear();
             room.Events.Clear();
+            EnterPhase(room, GamePhase.Negociacao);
+            startedToken = room.PhaseToken;
         }
 
         await BroadcastStateAsync(room);
+        _ = PhaseTimerAsync(room, startedToken);
     }
 
     // ----------------------------------------------------------------- avançar fase / rodada
-    public async Task NextPhaseAsync(string connectionId, string code)
+    // ----------------------------------------------------------------- motor de fases (tempo + prontidão)
+    // A fase NÃO depende mais do host: troca quando todos os jogadores ativos ficam prontos
+    // ou quando o cronômetro da fase zera. Segundos por fase (tunáveis):
+    private static readonly Dictionary<GamePhase, int> PhaseSeconds = new()
+    {
+        [GamePhase.Negociacao]   = 120,
+        [GamePhase.Investimento] = 90,
+        [GamePhase.Acoes]        = 90,
+        [GamePhase.Represarias]  = 60,
+        [GamePhase.Resultados]   = 45,
+    };
+
+    /// <summary>Entra numa fase: zera a prontidão, arma o cronômetro e roda o gatilho da fase. Chamar sob lock.</summary>
+    private static void EnterPhase(Room room, GamePhase phase)
+    {
+        room.Phase = phase;
+        foreach (var p in room.Players) p.Ready = false;
+        room.PhaseToken = Guid.NewGuid();
+        room.PhaseDeadlineUtc = DateTime.UtcNow.AddSeconds(PhaseSeconds.TryGetValue(phase, out var s) ? s : 60);
+
+        if (phase == GamePhase.Investimento) DealCards(room);
+        else if (phase == GamePhase.Resultados) ComputeResults(room);
+    }
+
+    /// <summary>Decide e aplica a próxima fase (fecha a rodada depois de Resultados). Chamar sob lock.</summary>
+    private static void AdvanceLocked(Room room)
+    {
+        if (room.Phase == GamePhase.Resultados)
+        {
+            room.Round++;
+            room.Proposals.Clear();   // negociação começa limpa a cada rodada
+            room.Events.Clear();      // eventos são por rodada
+            EnterPhase(room, GamePhase.Negociacao);
+        }
+        else
+        {
+            EnterPhase(room, (GamePhase)((int)room.Phase + 1));
+        }
+    }
+
+    /// <summary>Só conta quem pode agir: conectado, com país e não deposto.</summary>
+    private static bool AllReady(Room room)
+    {
+        var elegiveis = room.Players.Where(p => p.Connected && p.ChoseCountry && !p.Deposto).ToList();
+        return elegiveis.Count > 0 && elegiveis.All(p => p.Ready);
+    }
+
+    public async Task SetReadyAsync(string connectionId, string code, bool ready)
     {
         if (!_rooms.TryGetValue(code, out var room)) return;
+        bool advanced = false;
+        Guid token = default;
 
         lock (room.Sync)
         {
-            if (room.HostConnectionId != connectionId) return;   // só o host avança
             if (room.Phase == GamePhase.Lobby) return;
+            var p = room.Players.FirstOrDefault(x => x.Id == connectionId);
+            if (p == null || !p.ChoseCountry || p.Deposto) return;
 
-            if (room.Phase == GamePhase.Resultados)
-            {
-                // fecha a rodada e recomeça o ciclo na Negociação
-                room.Round++;
-                room.Phase = GamePhase.Negociacao;
-                room.Proposals.Clear();   // negociação começa limpa a cada rodada
-                room.Events.Clear();      // eventos são por rodada
-            }
-            else
-            {
-                room.Phase = (GamePhase)((int)room.Phase + 1);
-                if (room.Phase == GamePhase.Investimento) DealCards(room);
-                else if (room.Phase == GamePhase.Resultados) ComputeResults(room);
-            }
+            p.Ready = ready;
+            if (AllReady(room)) { AdvanceLocked(room); advanced = true; token = room.PhaseToken; }
         }
 
         await BroadcastStateAsync(room);
+        if (advanced) _ = PhaseTimerAsync(room, token);
+    }
+
+    /// <summary>Cronômetro da fase. O token garante que um timer de fase antiga não avance nada.</summary>
+    private async Task PhaseTimerAsync(Room room, Guid token)
+    {
+        while (true)
+        {
+            TimeSpan wait;
+            lock (room.Sync)
+            {
+                if (room.PhaseToken != token) return;                  // outra via já avançou
+                if (room.PhaseDeadlineUtc is not DateTime dl) return;
+                wait = dl - DateTime.UtcNow;
+            }
+
+            if (wait > TimeSpan.Zero)
+            {
+                try { await Task.Delay(wait); } catch { return; }
+            }
+
+            lock (room.Sync)
+            {
+                if (room.PhaseToken != token) return;
+                if (room.PhaseDeadlineUtc is DateTime dl2 && DateTime.UtcNow < dl2.AddMilliseconds(-100))
+                    continue;                                          // acordou cedo demais
+                AdvanceLocked(room);
+                token = room.PhaseToken;                               // segue cronometrando a próxima fase
+            }
+
+            await BroadcastStateAsync(room);
+        }
     }
 
     // ----------------------------------------------------------------- Investimento: distribuir e comprar cartas
@@ -330,19 +432,53 @@ public class GameService
             if (represalia && def.Alvo != "Inimigo")
                 return Fail("Nas Represálias só dá para usar cartas contra quem te agrediu.");
 
-            Player? target = null;
-            if (def.Alvo == "Inimigo")
+            // cartas contra países NPC (fornecedores)
+            if (def.Alvo == "Npc")
             {
-                target = room.Players.FirstOrDefault(p => p.Id == targetId && p.ChoseCountry);
-                if (target == null) return Fail("Escolha um alvo válido.");
-                if (target.Id == actor.Id) return Fail("Essa carta é contra um inimigo.");
-                if (represalia && !AggressorsOf(room, actor.Id).Contains(target.Id))
-                    return Fail("Nas Represálias você só pode revidar quem te agrediu nesta rodada.");
-            }
+                var id = (targetId ?? "").StartsWith("npc:", StringComparison.OrdinalIgnoreCase)
+                    ? targetId!["npc:".Length..] : targetId;
+                var npcAlvo = Npcs.FirstOrDefault(n => n.Id == id);
+                if (npcAlvo == null) return Fail("Escolha um país NPC válido.");
 
-            var msg = ApplyCardEffect(room, actor, target, def);
-            actor.Mao.Remove(held);
-            RecordEvent(room, actor.Id, target?.Id, "carta", $"{Label(room, actor.Id)} usou {def.Emoji} {def.Nome}{(target != null ? $" contra {Label(room, target.Id)}" : "")}. {msg}");
+                var st = StateOf(room, npcAlvo.Id);
+                string msgNpc;
+                if (def.Efeito == "bloqueia_npc")
+                {
+                    st.BloqueioRoundsLeft = SabotagemRounds;
+                    msgNpc = $"{npcAlvo.Name} para de vender por {SabotagemRounds} rodadas.";
+                }
+                else if (def.Efeito == "quebra_restrita")
+                {
+                    if (st.RestritaOwnerId == null) msgNpc = $"{npcAlvo.Name} não tinha Relação Restrita — sem efeito.";
+                    else
+                    {
+                        var antigo = Label(room, st.RestritaOwnerId);
+                        st.RestritaOwnerId = null;
+                        msgNpc = $"A Relação Restrita de {antigo} com {npcAlvo.Name} foi derrubada.";
+                    }
+                }
+                else msgNpc = "";
+
+                actor.Mao.Remove(held);
+                RecordEvent(room, actor.Id, null, "carta",
+                    $"{Label(room, actor.Id)} usou {def.Emoji} {def.Nome} contra {npcAlvo.Emoji} {npcAlvo.Name}. {msgNpc}");
+            }
+            else
+            {
+                Player? target = null;
+                if (def.Alvo == "Inimigo")
+                {
+                    target = room.Players.FirstOrDefault(p => p.Id == targetId && p.ChoseCountry);
+                    if (target == null) return Fail("Escolha um alvo válido.");
+                    if (target.Id == actor.Id) return Fail("Essa carta é contra um inimigo.");
+                    if (represalia && !AggressorsOf(room, actor.Id).Contains(target.Id))
+                        return Fail("Nas Represálias você só pode revidar quem te agrediu nesta rodada.");
+                }
+
+                var msg = ApplyCardEffect(room, actor, target, def);
+                actor.Mao.Remove(held);
+                RecordEvent(room, actor.Id, target?.Id, "carta", $"{Label(room, actor.Id)} usou {def.Emoji} {def.Nome}{(target != null ? $" contra {Label(room, target.Id)}" : "")}. {msg}");
+            }
         }
 
         await BroadcastStateAsync(room);
@@ -601,6 +737,10 @@ public class GameService
             if (eff.RoundsLeft <= 0) room.Ongoing.Remove(eff);
         }
 
+        // 2b) sabotagem de NPC expira com o tempo
+        foreach (var st in room.NpcStates.Values)
+            if (st.BloqueioRoundsLeft > 0) st.BloqueioRoundsLeft--;
+
         // 3) relações comerciais ativas trocam recursos (permite negativo)
         foreach (var rel in room.Relations.Where(r => r.Status == RelationStatus.Ativa))
         {
@@ -617,6 +757,14 @@ public class GameService
         foreach (var p in ativos)
         {
             p.Stats.Clamp();
+            // foto do fim da rodada, para os gráficos de evolução
+            p.History.Add(new Snapshot
+            {
+                Round = room.Round,
+                Dinheiro = p.Cofre.Dinheiro,
+                Populacao = p.Stats.Populacao,
+                Aprovacao = p.Stats.Aprovacao
+            });
             if (p.Stats.Aprovacao <= 0)
             {
                 p.Deposto = true;
@@ -665,11 +813,19 @@ public class GameService
                     FromId = connectionId, ToId = toId, ToIsNpc = true, Offer = off, Request = req
                 };
 
+                var estado = StateOf(room, npc.Id);
+                var querDele = QuerDe(room, npc, connectionId);   // já com ágio da Relação Restrita, se houver
+
                 // NPC aceita se recebe pelo menos o que pede E o pedido cabe no que ele dá
-                bool ofereceOSuficiente = off.CobreOuIgual(npc.Quer);
+                bool ofereceOSuficiente = off.CobreOuIgual(querDele);
                 bool pedidoCabe = npc.Da.CobreOuIgual(req);
 
-                if (ofereceOSuficiente && pedidoCabe)
+                if (estado.Bloqueado)
+                {
+                    prop.Status = ProposalStatus.Recusada;
+                    prop.Note = $"{npc.Name} está sabotada e não vende nada por {estado.BloqueioRoundsLeft} rodada(s).";
+                }
+                else if (ofereceOSuficiente && pedidoCabe)
                 {
                     // acerta na hora (NPC tem estoque infinito; só mexe no cofre do jogador). Permite negativo.
                     from.Cofre.Apply(off, -1);
@@ -679,8 +835,10 @@ public class GameService
                 }
                 else
                 {
+                    var agio = estado.RestritaOwnerId != null && estado.RestritaOwnerId != connectionId
+                        ? " (preço inflado por uma Relação Restrita de outro país)" : "";
                     prop.Status = ProposalStatus.Recusada;
-                    prop.Note = $"{npc.Name} só troca {Descrever(npc.Da)} por {Descrever(npc.Quer)}.";
+                    prop.Note = $"{npc.Name} só troca {Descrever(npc.Da)} por {Descrever(querDele)}{agio}.";
                 }
 
                 room.Proposals.Add(prop);
@@ -701,6 +859,37 @@ public class GameService
 
         await BroadcastStateAsync(room);
         return new { ok = true, resolved = npcResolved != null, status = npcResolved?.Status.ToString(), note = npcResolved?.Note };
+    }
+
+    // ----------------------------------------------------------------- comprar Relação Restrita com um NPC
+    public async Task<object> BuyRestritaAsync(string connectionId, string code, string npcId)
+    {
+        if (!_rooms.TryGetValue(code, out var room)) return Fail("Sala não encontrada.");
+
+        lock (room.Sync)
+        {
+            if (room.Phase != GamePhase.Negociacao) return Fail("A Relação Restrita se fecha na Negociação.");
+
+            var me = room.Players.FirstOrDefault(p => p.Id == connectionId);
+            if (me == null || !me.ChoseCountry || me.Deposto) return Fail("Você não pode negociar.");
+
+            var id = npcId.StartsWith("npc:", StringComparison.OrdinalIgnoreCase) ? npcId["npc:".Length..] : npcId;
+            var npc = Npcs.FirstOrDefault(n => n.Id == id);
+            if (npc == null) return Fail("NPC inválido.");
+
+            var st = StateOf(room, npc.Id);
+            if (st.RestritaOwnerId == connectionId) return Fail($"Você já tem a Relação Restrita com {npc.Name}.");
+            if (st.RestritaOwnerId != null) return Fail($"{npc.Name} já tem Relação Restrita com outro país.");
+            if (me.Cofre.Dinheiro < RestritaPrice) return Fail($"A Relação Restrita custa {RestritaPrice} 💰.");
+
+            me.Cofre.Dinheiro -= RestritaPrice;
+            st.RestritaOwnerId = connectionId;
+            RecordEvent(room, connectionId, null, "relacao",
+                $"🔒 {Label(room, connectionId)} fechou Relação Restrita com {npc.Emoji} {npc.Name}: o preço dela sobe {RestritaMarkupPct - 100}% para os demais.");
+        }
+
+        await BroadcastStateAsync(room);
+        return new { ok = true };
     }
 
     // ----------------------------------------------------------------- responder proposta (jogador↔jogador)
@@ -746,13 +935,24 @@ public class GameService
     {
         foreach (var room in _rooms.Values)
         {
-            bool touched = false;
+            bool touched = false, advanced = false;
+            Guid token = default;
             lock (room.Sync)
             {
                 var p = room.Players.FirstOrDefault(x => x.Id == connectionId);
-                if (p != null) { p.Connected = false; touched = true; }
+                if (p != null)
+                {
+                    p.Connected = false;
+                    touched = true;
+                    // quem caiu não pode travar a fase: os demais podem já estar todos prontos
+                    if (room.Phase != GamePhase.Lobby && AllReady(room))
+                    {
+                        AdvanceLocked(room); advanced = true; token = room.PhaseToken;
+                    }
+                }
             }
             if (touched) await BroadcastStateAsync(room);
+            if (advanced) _ = PhaseTimerAsync(room, token);
         }
     }
 
@@ -781,6 +981,13 @@ public class GameService
                     hostId = room.HostConnectionId,
                     minPlayers = MinPlayers,
                     meId = viewer.Id,
+                    // cronômetro da fase (epoch ms) e prontidão
+                    phaseDeadline = room.PhaseDeadlineUtc.HasValue
+                        ? new DateTimeOffset(room.PhaseDeadlineUtc.Value).ToUnixTimeMilliseconds()
+                        : (long?)null,
+                    meReady = viewer.Ready,
+                    readyCount = room.Players.Count(p => p.Connected && p.ChoseCountry && !p.Deposto && p.Ready),
+                    readyTotal = room.Players.Count(p => p.Connected && p.ChoseCountry && !p.Deposto),
                     players = room.Players.Select(p =>
                     {
                         var country = p.CountryId != null ? Catalog.FirstOrDefault(c => c.Id == p.CountryId) : null;
@@ -799,6 +1006,12 @@ public class GameService
                             title = p.Title.ToString(),
                             chose = p.ChoseCountry,
                             deposto = p.Deposto,
+                            ready = p.Ready,
+                            // histórico é público: alimenta os gráficos da tela de Resultados
+                            history = p.History.Select(h => new
+                            {
+                                round = h.Round, dinheiro = h.Dinheiro, populacao = h.Populacao, aprovacao = h.Aprovacao
+                            }).ToList(),
                             cofre = mostraPrivado ? CofreDto(p.Cofre) : null,
                             stats = mostraPrivado ? StatsDto(p.Stats) : null,
                             maoCount = p.Mao.Count,
@@ -817,21 +1030,36 @@ public class GameService
                         taken = taken.Contains(c.Id),
                         inicial = CofreDto(c.Inicial)
                     }).ToList(),
-                    npcs = Npcs.Select(n => new
+                    npcs = Npcs.Select(n =>
                     {
-                        id = "npc:" + n.Id,
-                        name = n.Name,
-                        emoji = n.Emoji,
-                        da = CofreDto(n.Da),
-                        quer = CofreDto(n.Quer)
+                        var st = StateOf(room, n.Id);
+                        var querParaMim = QuerDe(room, n, viewer.Id);
+                        return new
+                        {
+                            id = "npc:" + n.Id,
+                            name = n.Name,
+                            emoji = n.Emoji,
+                            da = CofreDto(n.Da),
+                            quer = CofreDto(querParaMim),          // já com ágio, se for o caso
+                            querBase = CofreDto(n.Quer),
+                            bloqueado = st.Bloqueado,
+                            bloqueioRounds = st.BloqueioRoundsLeft,
+                            souDonoRestrita = st.RestritaOwnerId == viewer.Id,
+                            restritaDono = st.RestritaOwnerId != null ? Label(room, st.RestritaOwnerId) : null,
+                            temAgio = st.RestritaOwnerId != null && st.RestritaOwnerId != viewer.Id,
+                            precoRestrita = RestritaPrice
+                        };
                     }).ToList(),
                     // propostas relevantes para este jogador
                     incoming = room.Proposals
                         .Where(p => !p.ToIsNpc && p.ToId == viewer.Id && p.Status == ProposalStatus.Pendente)
                         .Select(p => ProposalDto(room, p, viewer.Id)).ToList(),
+                    // "Minhas negociações": as que EU enviei (qualquer status) + as que RECEBI e já foram
+                    // resolvidas — senão quem aceita a proposta perde o registro dela de vista.
                     outgoing = room.Proposals
-                        .Where(p => p.FromId == viewer.Id)
-                        .OrderByDescending(p => p.CreatedUtc).Take(8)
+                        .Where(p => p.FromId == viewer.Id
+                                 || (!p.ToIsNpc && p.ToId == viewer.Id && p.Status != ProposalStatus.Pendente))
+                        .OrderByDescending(p => p.CreatedUtc).Take(10)
                         .Select(p => ProposalDto(room, p, viewer.Id)).ToList(),
                     // relações que envolvem este jogador
                     relations = room.Relations
@@ -903,6 +1131,7 @@ public class GameService
             fromId = p.FromId,
             toId = p.ToId,
             toIsNpc = p.ToIsNpc,
+            souRemetente = p.FromId == viewerId,   // inverte a leitura de quem recebeu a proposta
             counterpartLabel = label,
             counterpartEmoji = emoji,
             offer = CofreDto(p.Offer),

@@ -122,7 +122,22 @@ $("titlePicker").addEventListener("click", (ev) => {
 
 // ---------- controles do host ----------
 $("startBtn").onclick = () => conn.invoke("StartGame", myCode);
-$("nextBtn").onclick = () => conn.invoke("NextPhase", myCode);
+
+// A fase troca sozinha: quando todos ficam prontos ou o tempo acaba.
+$("readyBtn").onclick = () => conn.invoke("SetReady", myCode, !(lastState && lastState.meReady));
+
+// cronômetro local, só visual (a decisão de virar a fase é do servidor)
+let phaseDeadline = null;
+setInterval(() => {
+  const el = $("phaseTimer");
+  if (!el) return;
+  if (!phaseDeadline) { el.textContent = "--:--"; el.classList.remove("urgent"); return; }
+  const restam = Math.max(0, Math.round((phaseDeadline - Date.now()) / 1000));
+  const m = String(Math.floor(restam / 60)).padStart(2, "0");
+  const s = String(restam % 60).padStart(2, "0");
+  el.textContent = `⏱ ${m}:${s}`;
+  el.classList.toggle("urgent", restam <= 10);
+}, 250);
 
 // ---------- render do estado ----------
 conn.on("state", (s) => applyState(s));
@@ -242,19 +257,22 @@ function renderGame(s) {
         <span class="who">${p.countryName ?? "—"}</span>
         <span class="role">${p.name} · ${p.title}${p.isHost ? " · host" : ""}${p.isMe ? " · você" : ""}${p.deposto ? " · 💀" : ""}</span>
         ${p.maoCount ? `<span class="badge">🃏 ${p.maoCount}</span>` : ""}
+        ${p.ready ? '<span class="badge ready">✅ pronto</span>' : ""}
         ${p.connected ? "" : '<span class="off">offline</span>'}
       </div>
       ${privado}`;
     nat.appendChild(div);
   }
 
-  // controles do host
-  if (iAmHost(s)) {
-    show($("hostControls"));
-    $("nextBtn").textContent = s.phase === "Resultados" ? "Próxima rodada ⟳" : "Avançar fase ▶";
-  } else {
-    hide($("hostControls"));
-  }
+  // cronômetro + prontidão (substitui o antigo controle do host)
+  phaseDeadline = s.phaseDeadline || null;
+  const euAtivo = mine && mine.chose && !mine.deposto;
+  if (euAtivo) {
+    show($("readyBar"));
+    $("readyBtn").textContent = s.meReady ? "⏳ Aguardando os outros (clique p/ cancelar)" : "✅ Estou pronto";
+    $("readyBtn").classList.toggle("primary", !s.meReady);
+  } else hide($("readyBar"));
+  $("readyHint").textContent = `${s.readyCount ?? 0}/${s.readyTotal ?? 0} prontos — a fase vira quando todos estiverem prontos ou o tempo acabar.`;
 }
 
 function cofreHtml(cofre) {
@@ -284,20 +302,23 @@ function custoHtml(custo) {
   return parts.length ? parts.join(" · ") : "grátis";
 }
 
-// mode: "offer" (comprar) | "hand" (só exibir) | "play" (jogar na fase de Ações)
+// mode: "offer" (comprar) | "hand" (só exibir) | "play" (jogar) | "fixa" (ação sempre disponível)
 function cardHtml(c, mode) {
   const alvo = c.alvo && c.alvo !== "Nenhum"
     ? `<span class="calvo ${c.alvo}">${c.alvo === "Proprio" ? "Você" : c.alvo}</span>` : "";
-  const custo = mode === "offer" ? `<div class="ccusto"><span class="lbl">Custo:</span> ${custoHtml(c.custo)}</div>` : "";
+  const mostraCusto = mode === "offer" || (mode === "fixa" && c.custo);
+  const custo = mostraCusto ? `<div class="ccusto"><span class="lbl">Custo:</span> ${custoHtml(c.custo)}</div>` : "";
   let btn = "";
   if (mode === "offer") {
     btn = `<button class="btn small ${c.podePagar ? "primary" : ""}" ${c.podePagar ? "" : "disabled"} data-offer="${c.id}">
              ${c.podePagar ? "Comprar" : "Sem saldo"}</button>`;
   } else if (mode === "play") {
     btn = `<button class="btn primary small playbtn" data-play="${c.id}" data-alvo="${c.alvo}">Jogar</button>`;
+  } else if (mode === "fixa") {
+    btn = `<button class="btn danger small playbtn" data-fixa="${c.id}">Usar</button>`;
   }
   return `
-    <div class="card ${mode !== "offer" ? "hand" : ""} ${mode === "play" ? "playable" : ""}">
+    <div class="card ${mode === "offer" ? "" : "hand"} ${mode === "play" ? "playable" : ""} ${mode === "fixa" ? "fixa" : ""}">
       <div class="chead"><span class="cemoji">${c.emoji ?? "🃏"}</span><span class="cnome">${c.nome}</span>${alvo}</div>
       <div class="cdesc">${c.descricao ?? ""}</div>
       ${custo}${btn}
@@ -374,24 +395,34 @@ function renderAcoes(s) {
   tools.style.display = podeAgir ? "" : "none";
   // criar relação só existe na fase de Ações
   $("relCreate").style.display = isAcoes ? "" : "none";
-  $("btnAtacar").style.display = "";
 
   if (podeAgir) {
-    // mão jogável — em Represálias, só cartas de inimigo
+    // alvos possíveis: todos (Ações) ou só agressores (Represálias)
+    alvosAtuais = isRepr
+      ? aggressors.map((a) => ({ id: a.id, label: a.label, emoji: "" }))
+      : s.players.filter((p) => !p.isMe && p.chose && !p.deposto)
+                 .map((p) => ({ id: p.id, label: `${p.countryName} (${p.name})`, emoji: p.emoji }));
+
+    npcsAtuais = (s.npcs || []).map((n) => ({
+      id: n.id, label: n.name, emoji: n.emoji, isNpc: true,
+      hint: n.bloqueado ? `💣 já sabotada (${n.bloqueioRounds} rodada(s))`
+          : (n.restritaDono ? `🔒 Relação Restrita de ${n.restritaDono}` : `vende ${resSummary(n.da)}`)
+    }));
+
+    // ações fixas viram cartas (sempre disponíveis, não são compradas)
+    $("acaoFixas").innerHTML = ACOES_FIXAS.map((a) => cardHtml({
+      id: a.id, nome: a.nome, emoji: a.emoji, descricao: a.descricao, alvo: "Inimigo", custo: a.custo
+    }, "fixa")).join("");
+    $("acaoFixas").querySelectorAll("button[data-fixa]").forEach((b) =>
+      b.onclick = () => acaoFixa(b.dataset.fixa));
+
+    // mão comprada — em Represálias, só cartas de inimigo
     let hand = (mine && mine.mao) || [];
     if (isRepr) hand = hand.filter((c) => c.alvo === "Inimigo");
     $("acaoHand").innerHTML = hand.length ? hand.map((c) => cardHtml(c, "play")).join("")
       : `<div class="empty-note">${isRepr ? "Nenhuma carta de ataque na mão." : "Sem cartas na mão. Compre no Investimento."}</div>`;
     $("acaoHand").querySelectorAll("button[data-play]").forEach((b) =>
       b.onclick = () => playCard(b.dataset.play, b.dataset.alvo));
-
-    // alvos: todos (Ações) ou só agressores (Represálias)
-    const alvos = isRepr
-      ? aggressors.map((a) => ({ id: a.id, text: a.label }))
-      : s.players.filter((p) => !p.isMe && p.chose && !p.deposto).map((p) => ({ id: p.id, text: `${p.emoji ?? ""} ${p.countryName} (${p.name})` }));
-    $("actTarget").innerHTML = alvos.length
-      ? alvos.map((a) => `<option value="${a.id}">${a.text}</option>`).join("")
-      : '<option value="">— sem alvos —</option>';
   }
 
   // relações comerciais (aceitar/cortar valem em Ações e Represálias)
@@ -438,31 +469,82 @@ function renderEvents(s, el) {
   }
 }
 
-async function playCard(handId, alvo) {
-  let targetId = null;
-  if (alvo === "Inimigo") {
-    targetId = $("actTarget").value;
-    if (!targetId) return acaoMsg("Escolha um alvo para essa carta.", true);
+// ---------- modal de alvo ----------
+// Escolher alvo por dropdown ficava escondido; agora toda ação com alvo abre este popup.
+let alvosAtuais = [];
+let npcsAtuais = [];
+
+function abrirModalAlvo({ titulo, sub, alvos, onPick }) {
+  if (!alvos.length) return acaoMsg("Nenhum alvo disponível.", true);
+  $("modalTitle").textContent = titulo;
+  $("modalSub").textContent = sub || "";
+  const box = $("modalTargets");
+  box.innerHTML = "";
+  for (const a of alvos) {
+    const btn = document.createElement("button");
+    btn.className = "target" + (a.isNpc ? " npc-target" : "");
+    btn.innerHTML = `<div class="tname">${a.emoji ?? ""} ${a.label}${a.isNpc ? '<span class="npc-tag">NPC</span>' : ""}</div>
+                     ${a.hint ? `<div class="toffer">${a.hint}</div>` : ""}`;
+    btn.onclick = () => { fecharModal(); onPick(a.id); };
+    box.appendChild(btn);
   }
-  const r = await conn.invoke("PlayCard", myCode, handId, targetId);
-  if (!r.ok) acaoMsg(r.error, true);
+  show($("targetModal"));
+}
+function fecharModal() { hide($("targetModal")); }
+$("modalClose").onclick = fecharModal;
+$("targetModal").onclick = (e) => { if (e.target === $("targetModal")) fecharModal(); };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharModal(); });
+
+// ---------- ações fixas (sempre disponíveis, como cartas) ----------
+const ACOES_FIXAS = [
+  { id: "atacar",  nome: "Ataque Militar", emoji: "⚔️", descricao: "Invade o alvo. O dano depende da sua força militar contra a dele.", custo: null },
+  { id: "difamar", nome: "Difamação",      emoji: "📢", descricao: "Derruba a credibilidade e a aprovação do alvo.", custo: { dinheiro: 150, terra: 0, petroleo: 0, alimento: 0, militares: 0, divida: 0 } },
+];
+
+function acaoFixa(id) {
+  const meta = ACOES_FIXAS.find((a) => a.id === id);
+  abrirModalAlvo({
+    titulo: `${meta.emoji} ${meta.nome}`,
+    sub: "Escolha o país alvo",
+    alvos: alvosAtuais,
+    onPick: async (targetId) => {
+      const metodo = id === "atacar" ? "MilitaryAttack" : "Defame";
+      const r = await conn.invoke(metodo, myCode, targetId);
+      if (!r.ok) acaoMsg(r.error, true);
+    }
+  });
 }
 
-$("btnAtacar").onclick = async () => {
-  const t = $("actTarget").value; if (!t) return acaoMsg("Escolha um alvo.", true);
-  const r = await conn.invoke("MilitaryAttack", myCode, t);
-  if (!r.ok) acaoMsg(r.error, true);
-};
-$("btnDifamar").onclick = async () => {
-  const t = $("actTarget").value; if (!t) return acaoMsg("Escolha um alvo.", true);
-  const r = await conn.invoke("Defame", myCode, t);
-  if (!r.ok) acaoMsg(r.error, true);
-};
-$("btnCriarRel").onclick = async () => {
-  const t = $("actTarget").value; if (!t) return acaoMsg("Escolha um alvo.", true);
+async function playCard(handId, alvo) {
+  if (alvo !== "Inimigo" && alvo !== "Npc") {   // Proprio/Todos não precisam de alvo
+    const r = await conn.invoke("PlayCard", myCode, handId, null);
+    if (!r.ok) acaoMsg(r.error, true);
+    return;
+  }
+  // cartas "Npc" miram os países fornecedores; as demais, os jogadores
+  const alvos = alvo === "Npc" ? npcsAtuais : alvosAtuais;
+  abrirModalAlvo({
+    titulo: alvo === "Npc" ? "Escolher país NPC" : "Escolher alvo da carta",
+    sub: alvo === "Npc" ? "Qual fornecedor atingir?" : "Contra quem usar esta carta?",
+    alvos,
+    onPick: async (targetId) => {
+      const r = await conn.invoke("PlayCard", myCode, handId, targetId);
+      if (!r.ok) acaoMsg(r.error, true);
+    }
+  });
+}
+
+$("btnCriarRel").onclick = () => {
   const give = readRel("relgive"), get = readRel("relget");
-  const r = await conn.invoke("ProposeRelation", myCode, t, give, get);
-  if (!r.ok) acaoMsg(r.error, true); else acaoMsg("Relação proposta. Aguardando aceite.", false);
+  abrirModalAlvo({
+    titulo: "🤝 Relação comercial",
+    sub: "Com quem firmar o acordo recorrente?",
+    alvos: alvosAtuais,
+    onPick: async (targetId) => {
+      const r = await conn.invoke("ProposeRelation", myCode, targetId, give, get);
+      if (!r.ok) acaoMsg(r.error, true); else acaoMsg("Relação proposta. Aguardando aceite.", false);
+    }
+  });
 };
 
 function acaoMsg(msg, isErr) {
@@ -471,8 +553,91 @@ function acaoMsg(msg, isErr) {
   clearTimeout(acaoMsg._t); acaoMsg._t = setTimeout(() => hide(m), 3500);
 }
 
-// ---------- resultados ----------
+// ---------- resultados: abas + gráficos de evolução ----------
+// Escalas incompatíveis (dinheiro em milhares, população em milhões, aprovação 0-100),
+// então são TRÊS gráficos separados — nunca dois eixos no mesmo desenho.
+let abaSelecionada = null;
+
+const METRICAS = [
+  { key: "dinheiro",  label: "💰 Dinheiro",  cor: "#c98500", suf: "" },
+  { key: "populacao", label: "👥 População", cor: "#3987e5", suf: "mi" },
+  { key: "aprovacao", label: "📊 Aprovação", cor: "#199e70", suf: "%" },
+];
+
+function miniChart(hist, m) {
+  const pts = hist.map((h) => ({ x: h.round, y: h[m.key] }));
+  const atual = pts.length ? pts[pts.length - 1].y : 0;
+  const anterior = pts.length > 1 ? pts[pts.length - 2].y : null;
+  const delta = anterior === null ? null : atual - anterior;
+  const deltaTxt = delta === null ? ""
+    : `<span class="chart-delta ${delta >= 0 ? "up" : "down"}">${delta >= 0 ? "▲" : "▼"} ${Math.abs(delta)}${m.suf}</span>`;
+
+  let corpo;
+  if (pts.length < 2) {
+    corpo = '<div class="chart-empty">Precisa de 2 rodadas para desenhar a evolução.</div>';
+  } else {
+    const W = 300, H = 90, pad = 6;
+    const ys = pts.map((p) => p.y);
+    let min = Math.min(...ys), max = Math.max(...ys);
+    if (min === max) { min -= 1; max += 1; }          // série plana ainda precisa de altura
+    const sx = (i) => pad + (i * (W - pad * 2)) / (pts.length - 1);
+    const sy = (v) => H - pad - ((v - min) / (max - min)) * (H - pad * 2);
+    const linha = pts.map((p, i) => `${i ? "L" : "M"}${sx(i).toFixed(1)},${sy(p.y).toFixed(1)}`).join(" ");
+    const area = `${linha} L${sx(pts.length - 1).toFixed(1)},${H - pad} L${sx(0).toFixed(1)},${H - pad} Z`;
+    const marcadores = pts.map((p, i) =>
+      `<circle class="chart-dot" cx="${sx(i).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="4" fill="${m.cor}"
+        stroke="var(--panel)" stroke-width="2"><title>Rodada ${p.x}: ${p.y}${m.suf}</title></circle>`).join("");
+    corpo = `
+      <svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+           aria-label="${m.label} por rodada">
+        <line class="grid" x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" />
+        <path d="${area}" fill="${m.cor}" opacity="0.12" />
+        <path d="${linha}" fill="none" stroke="${m.cor}" stroke-width="2"
+              stroke-linejoin="round" stroke-linecap="round" />
+        ${marcadores}
+      </svg>
+      <div class="tiny muted">Rodada ${pts[0].x} → ${pts[pts.length - 1].x}</div>`;
+  }
+
+  return `
+    <div class="chart-card">
+      <div class="chart-head">
+        <span class="chart-title">${m.label}</span>
+        <span class="chart-now" style="color:${m.cor}">${atual}${m.suf}</span>
+        ${deltaTxt}
+      </div>
+      ${corpo}
+    </div>`;
+}
+
+function renderAbasResultados(s) {
+  const jogadores = s.players.filter((p) => p.chose);
+  if (!jogadores.length) return;
+  if (!jogadores.some((p) => p.id === abaSelecionada)) {
+    abaSelecionada = (jogadores.find((p) => p.isMe) || jogadores[0]).id;
+  }
+
+  const tabs = $("resTabs");
+  tabs.innerHTML = "";
+  for (const p of jogadores) {
+    const b = document.createElement("button");
+    b.className = "res-tab" + (p.id === abaSelecionada ? " active" : "");
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", p.id === abaSelecionada ? "true" : "false");
+    b.textContent = `${p.emoji ?? "❔"} ${p.countryName}${p.isMe ? " (você)" : ""}`;
+    b.onclick = () => { abaSelecionada = p.id; renderAbasResultados(lastState); };
+    tabs.appendChild(b);
+  }
+
+  const alvo = jogadores.find((p) => p.id === abaSelecionada);
+  const hist = (alvo && alvo.history) || [];
+  $("resCharts").innerHTML = hist.length
+    ? METRICAS.map((m) => miniChart(hist, m)).join("")
+    : '<div class="chart-empty">Sem histórico ainda.</div>';
+}
+
 function renderResultados(s) {
+  renderAbasResultados(s);
   const ob = $("resOngoing");
   if (s.ongoing && s.ongoing.length) {
     ob.innerHTML = "⏳ Efeitos ativos: " + s.ongoing.map((e) => `${e.emoji} ${e.nome} (${e.roundsLeft} turno(s))`).join(" · ");
@@ -545,7 +710,14 @@ function renderNeg(s) {
   targets.innerHTML = "";
   const others = s.players.filter((p) => !p.isMe && p.chose && p.connected);
   for (const p of others) targets.appendChild(targetCard(p.id, false, p.emoji, p.countryName, null));
-  for (const n of s.npcs) targets.appendChild(targetCard(n.id, true, n.emoji, n.name, `dá ${resSummary(n.da)} · quer ${resSummary(n.quer)}`, n));
+  for (const n of s.npcs) {
+    let hint;
+    if (n.bloqueado) hint = `💣 sabotada — não vende por ${n.bloqueioRounds} rodada(s)`;
+    else hint = `dá ${resSummary(n.da)} · quer ${resSummary(n.quer)}`
+              + (n.temAgio ? ` ⚠️ inflado por ${n.restritaDono}` : "")
+              + (n.souDonoRestrita ? " 🔒 sua Relação Restrita" : "");
+    targets.appendChild(targetCard(n.id, true, n.emoji, n.name, hint, n));
+  }
 
   if (others.length === 0 && s.npcs.length === 0)
     targets.innerHTML = '<div class="empty-note">Ninguém para negociar ainda.</div>';
@@ -582,14 +754,19 @@ function renderNeg(s) {
   // minhas propostas enviadas
   const out = $("outgoingList");
   out.innerHTML = "";
-  if (!s.outgoing.length) out.innerHTML = '<div class="empty-note">Você ainda não enviou propostas.</div>';
+  if (!s.outgoing.length) out.innerHTML = '<div class="empty-note">Nenhuma negociação ainda.</div>';
   for (const p of s.outgoing) {
     const div = document.createElement("div");
     div.className = "prop";
     const st = p.status.toLowerCase();
+    // quem RECEBEU a proposta lê ao contrário: a "oferta" do remetente é o que ele ganha
+    const euDou = p.souRemetente ? p.offer : p.request;
+    const euRecebo = p.souRemetente ? p.request : p.offer;
+    const direcao = p.souRemetente ? "enviada" : "recebida";
     div.innerHTML = `
-      <div class="phead"><span>${p.counterpartEmoji ?? "❔"}</span><span class="pwho">${p.counterpartLabel}</span></div>
-      <div class="pterms">Você dá <span class="give">${resSummary(p.offer)}</span> · quer <span class="get">${resSummary(p.request)}</span></div>
+      <div class="phead"><span>${p.counterpartEmoji ?? "❔"}</span><span class="pwho">${p.counterpartLabel}</span>
+        <span class="badge">${direcao}</span></div>
+      <div class="pterms">Você dá <span class="give">${resSummary(euDou)}</span> · recebe <span class="get">${resSummary(euRecebo)}</span></div>
       <div class="pstatus ${st}">${statusLabel(p.status)}${p.note ? " — " + p.note : ""}</div>`;
     out.appendChild(div);
   }
@@ -618,9 +795,26 @@ function selectTarget(id, isNpc, label, npc) {
   // NPC: pré-preenche com o negócio fixo dele (ofereço o que ele quer, peço o que ele dá)
   if (isNpc && npc) {
     setRes("off", npc.quer); setRes("req", npc.da);
-    $("tbNpcHint").textContent = `A ${npc.name} só fecha se você oferecer pelo menos o que ela pede. Pré-preenchi o negócio dela.`;
+    let hint = `A ${npc.name} só fecha se você oferecer pelo menos o que ela pede. Pré-preenchi o negócio dela.`;
+    if (npc.bloqueado) hint = `💣 ${npc.name} foi sabotada e não vende por ${npc.bloqueioRounds} rodada(s).`;
+    else if (npc.temAgio) hint += ` ⚠️ O preço está inflado porque ${npc.restritaDono} tem Relação Restrita com ela.`;
+    else if (npc.souDonoRestrita) hint += ` 🔒 Você tem a Relação Restrita: paga o preço normal e os outros pagam mais.`;
+    $("tbNpcHint").textContent = hint;
     show($("tbNpcHint"));
+    // botão de comprar a Relação Restrita (acordo caro e exclusivo)
+    const rb = $("restritaBtn");
+    if (!npc.souDonoRestrita && !npc.restritaDono) {
+      rb.textContent = `🔒 Fechar Relação Restrita com ${npc.name} (${npc.precoRestrita} 💰)`;
+      rb.onclick = async () => {
+        const r = await conn.invoke("BuyRestrita", myCode, npc.id);
+        const m = $("negMsg");
+        m.textContent = r.ok ? `🔒 Relação Restrita fechada com ${npc.name}!` : r.error;
+        m.className = "tiny " + (r.ok ? "ok" : "err"); show(m);
+      };
+      show(rb);
+    } else hide(rb);
   } else {
+    hide($("restritaBtn"));
     setRes("off", null); setRes("req", null);
     hide($("tbNpcHint"));
   }

@@ -97,6 +97,12 @@ input:focus { outline: none; border-color: var(--accent); }
   border-bottom: 1px solid var(--line); overflow-x: auto;
 }
 .round-bar > span { white-space: nowrap; font-size: 14px; color: var(--muted); }
+.round-bar .timer {
+  font-variant-numeric: tabular-nums; font-weight: 700; color: var(--txt);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px;
+}
+.round-bar .timer.urgent { color: #fff; background: var(--danger); border-color: var(--danger); }
+.nation .badge.ready { color: var(--ok); }
 .round-bar strong { color: var(--accent2); }
 .phase-steps { display: flex; gap: 6px; }
 .step {
@@ -220,6 +226,30 @@ input:focus { outline: none; border-color: var(--accent); }
 }
 .result-line.warn { border-left-color: var(--accent2); }
 .result-line.bad { border-left-color: var(--danger); }
+/* resultados: abas por país + gráficos de evolução */
+.res-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; }
+.res-tab {
+  white-space: nowrap; padding: 8px 12px; border-radius: 999px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line); color: var(--muted); font-size: 13px;
+}
+.res-tab.active { background: var(--panel2); border-color: var(--accent); color: var(--txt); font-weight: 700; }
+.res-charts { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+.chart-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px;
+}
+.chart-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.chart-title { font-size: 13px; color: var(--muted); }
+.chart-now { font-size: 20px; font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
+.chart-delta { font-size: 12px; font-variant-numeric: tabular-nums; }
+.chart-delta.up { color: var(--ok); }
+.chart-delta.down { color: var(--danger); }
+.chart-svg { width: 100%; height: 90px; display: block; overflow: visible; }
+.chart-svg .grid { stroke: var(--line); stroke-width: 1; }
+.chart-svg .axis-label { fill: var(--muted); font-size: 10px; }
+.chart-empty { color: var(--muted); font-size: 13px; font-style: italic; }
+.chart-dot { cursor: pointer; }
+.chart-dot:hover { r: 6; }
+
 .result-block { margin-bottom: 12px; }
 .result-block h4 { margin: 0 0 6px; font-size: 14px; }
 
@@ -244,6 +274,34 @@ h4 { margin: 16px 0 6px; font-size: 13px; color: var(--muted); }
 }
 .event.mine { border-left-color: var(--accent); }
 .event.againstMe { border-left-color: var(--danger); background: #2a1720; }
+
+/* modal de escolha de alvo */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 50;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.modal-backdrop[hidden] { display: none; }
+.modal {
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 16px;
+  padding: 16px; width: 100%; max-width: 460px; max-height: 80vh; overflow-y: auto;
+  animation: pop .15s ease;
+}
+@keyframes pop { from { transform: scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+.modal-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.modal-title { font-size: 17px; font-weight: 700; }
+.modal-x {
+  margin-left: auto; background: transparent; border: none; color: var(--muted);
+  font-size: 20px; cursor: pointer; line-height: 1; padding: 4px;
+}
+.modal-x:hover { color: var(--txt); }
+.target.npc-target { border-style: dashed; }
+
+/* cartas de ação fixas (atacar/difamar) */
+.card.fixa { border-color: var(--accent2); background: linear-gradient(180deg, var(--panel2), var(--panel)); }
+.card.fixa .cnome { color: var(--accent2); }
+
+.btn.restrita { background: #4b2e83; border-color: #6b46c1; color: #fff; }
+.card .calvo.Npc { background: #6b46c1; color: #fff; }
 
 .card .playbtn { margin-top: 4px; }
 .card.hand.playable { border-color: var(--accent2); }

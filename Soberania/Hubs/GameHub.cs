@@ -21,8 +21,9 @@ public class GameHub : Hub
 
     public Task StartGame(string code) => _game.StartGameAsync(Context.ConnectionId, code);
 
-    // host avança para a próxima fase (e, depois de Resultados, para a próxima rodada)
-    public Task NextPhase(string code) => _game.NextPhaseAsync(Context.ConnectionId, code);
+    // a fase troca sozinha (tempo ou todos prontos) — o host não decide mais
+    public Task SetReady(string code, bool ready) =>
+        _game.SetReadyAsync(Context.ConnectionId, code, ready);
 
     // ------- Negociação -------
     public Task<object> SendProposal(string code, string toId, ResourceDto offer, ResourceDto request) =>
@@ -30,6 +31,10 @@ public class GameHub : Hub
 
     public Task RespondProposal(string code, string proposalId, bool accept) =>
         _game.RespondProposalAsync(Context.ConnectionId, code, proposalId, accept);
+
+    // acordo caro e exclusivo com um NPC: encarece o preço dele para os outros
+    public Task<object> BuyRestrita(string code, string npcId) =>
+        _game.BuyRestritaAsync(Context.ConnectionId, code, npcId);
 
     // ------- Investimento -------
     public Task BuyCard(string code, string offerId) =>
