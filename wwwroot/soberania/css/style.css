@@ -160,6 +160,35 @@ input:focus { outline: none; border-color: var(--accent); }
 .tb-head { font-size: 15px; margin-bottom: 8px; }
 .tb-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .tb-label { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+/* missão */
+.missao-btn {
+  white-space: nowrap; padding: 5px 12px; border-radius: 999px; cursor: pointer; font-size: 13px;
+  font-weight: 700; background: var(--panel2); color: var(--accent2);
+  border: 1px solid var(--accent2);
+}
+.missao-btn:hover { background: var(--accent2); color: #1a1200; }
+.missao-btn.done { background: var(--ok); border-color: var(--ok); color: #052e22; }
+.mi-alvo {
+  background: var(--panel); border: 1px solid var(--danger); border-radius: 10px;
+  padding: 8px 10px; margin: 10px 0; font-size: 14px;
+}
+.mi-prog-track {
+  height: 12px; border-radius: 999px; background: var(--panel);
+  border: 1px solid var(--line); overflow: hidden; margin: 6px 0;
+}
+.mi-prog-fill { height: 100%; background: var(--accent); transition: width .3s ease; }
+.mi-prog-fill.done { background: var(--ok); }
+.mi-nums { display: flex; justify-content: space-between; font-size: 13px; }
+.mi-nums b { font-variant-numeric: tabular-nums; }
+
+.vitoria {
+  margin: 12px 16px; padding: 20px; border-radius: 14px; text-align: center;
+  background: linear-gradient(135deg, #3b2f00, #1a1200);
+  border: 2px solid var(--accent2); animation: pop .3s ease;
+}
+.vitoria .vt { font-size: 26px; font-weight: 800; color: var(--accent2); }
+.vitoria .vs { color: var(--txt); margin-top: 6px; }
+
 .valor-tag { font-weight: 400; color: var(--muted); font-size: 11px; }
 .valor-tag b { color: var(--txt); }
 .tb-label.give { color: var(--accent2); }

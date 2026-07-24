@@ -162,6 +162,28 @@ public class Investment
     public int RendimentoTravadoPct { get; set; }    // taxa efetiva no momento da aplicação
 }
 
+/// <summary>Modelo de missão (catálogo fixo). Sorteada no início da partida.</summary>
+public class MissionDef
+{
+    public string Id { get; set; } = "";
+    public string Titulo { get; set; } = "";
+    public string Emoji { get; set; } = "";
+    public string Tipo { get; set; } = "";      // chave usada na avaliação
+    public int Meta { get; set; }                // valor a atingir
+    public bool PrecisaAlvo { get; set; }        // missões contra alguém sorteiam um adversário
+    public string Dica { get; set; } = "";       // como cumprir, em texto
+}
+
+/// <summary>A missão de um jogador nesta partida.</summary>
+public class Mission
+{
+    public string DefId { get; set; } = "";
+    public int Meta { get; set; }
+    public string? TargetId { get; set; }        // adversário sorteado, quando a missão exige
+    public bool Concluida { get; set; }
+    public int RoundConcluida { get; set; }
+}
+
 /// <summary>Instância de carta que um jogador possui (oferta no Investimento ou carta na mão).</summary>
 public class HeldCard
 {
@@ -308,6 +330,7 @@ public class Player
     public int TaxaImposto { get; set; } = 50;   // 0..100 — quanto você espreme a população
     public int PazInternaRounds { get; set; }    // rodadas de imunidade após uma guerra civil
     public int AtaquesNaFase { get; set; }       // 1 ataque militar por fase (zera a cada fase)
+    public Mission? Missao { get; set; }         // objetivo secreto: cumprir = vencer a partida
 
     // histórico por rodada, para os gráficos da tela de Resultados
     public List<Snapshot> History { get; } = new();
@@ -332,6 +355,9 @@ public class Room
     public List<Player> Players { get; } = new();
     public GamePhase Phase { get; set; } = GamePhase.Lobby;
     public int Round { get; set; }             // 0 no lobby; começa em 1 ao iniciar o jogo
+
+    public string? WinnerId { get; set; }        // quem cumpriu a missão primeiro — encerra a partida
+    public bool Acabou => WinnerId != null;
 
     // a fase troca sozinha: quando todos ficam prontos OU quando o tempo acaba
     public DateTime? PhaseDeadlineUtc { get; set; }

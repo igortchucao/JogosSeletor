@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Soberania</title>
-<link rel="stylesheet" href="css/style.css?v=14" />
+<link rel="stylesheet" href="css/style.css?v=15" />
 </head>
 <body>
   <header class="topbar">
@@ -62,7 +62,25 @@
       <div class="round-bar">
         <span>Rodada <strong id="roundNum">1</strong></span>
         <span class="timer" id="phaseTimer">--:--</span>
+        <button id="missaoBtn" class="missao-btn">🎯 Missão</button>
         <div class="phase-steps" id="phaseSteps"></div>
+      </div>
+
+      <!-- VITÓRIA -->
+      <div id="vitoriaBanner" class="vitoria" hidden></div>
+
+      <!-- MODAL DE MISSÃO -->
+      <div id="missaoModal" class="modal-backdrop" hidden>
+        <div class="modal">
+          <div class="modal-head">
+            <div>
+              <div class="modal-title" id="miTitulo">Sua missão</div>
+              <div class="modal-sub tiny muted">Cumpra e você vence a partida. Ninguém mais vê sua missão.</div>
+            </div>
+            <button class="modal-x" id="miClose" aria-label="Fechar">✕</button>
+          </div>
+          <div id="miCorpo"></div>
+        </div>
       </div>
 
       <div class="phase-panel pad">
@@ -263,6 +281,6 @@
   <footer class="foot tiny" id="foot"></footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
-  <script src="js/app.js?v=14"></script>
+  <script src="js/app.js?v=15"></script>
 </body>
 </html>

@@ -59,6 +59,114 @@ public class GameService
                 Descricao = "Derruba a Relação Restrita que alguém tenha com esse NPC.", Custo = new() { Dinheiro = 400 } },
     };
 
+    // ----------------------------------------------------------------- missões (condição de vitória)
+    // Cada jogador recebe UMA missão secreta ao iniciar. Cumprir = vencer a partida.
+    private static readonly List<MissionDef> Missoes = new()
+    {
+        new() { Id = "ouro",       Titulo = "Cofre Imperial",     Emoji = "💰", Tipo = "dinheiro",     Meta = 4000,
+                Dica = "Acumule dinheiro vendendo recursos aos NPCs e aplicando no mercado." },
+        new() { Id = "patrimonio", Titulo = "Potência Econômica", Emoji = "🏆", Tipo = "patrimonio",   Meta = 9000,
+                Dica = "Vale o patrimônio TOTAL em g (todos os recursos somados pela tabela de equivalência)." },
+        new() { Id = "amado",      Titulo = "Amado pelo Povo",    Emoji = "😀", Tipo = "satisfacao",   Meta = 95,
+                Dica = "Baixe os impostos e evite guerras. Satisfação sobe devagar." },
+        new() { Id = "respeitado", Titulo = "Nome Impecável",     Emoji = "🎖️", Tipo = "credibilidade", Meta = 90,
+                Dica = "Propaganda, ajuda humanitária e nunca difamar ninguém." },
+        new() { Id = "populoso",   Titulo = "Berço do Mundo",     Emoji = "👥", Tipo = "populacao",    Meta = 400,
+                Dica = "Credibilidade e satisfação altas atraem imigrantes todo turno." },
+        new() { Id = "exercito",   Titulo = "Máquina de Guerra",  Emoji = "🪖", Tipo = "militares",    Meta = 200,
+                Dica = "Compre militares nas trocas — eles valem 10g cada." },
+        new() { Id = "petroestado",Titulo = "Petroestado",        Emoji = "🛢️", Tipo = "petroleo",     Meta = 250,
+                Dica = "Compre petróleo dos NPCs e use a carta Descoberta de Petróleo." },
+        new() { Id = "difamar",    Titulo = "Assassinato de Reputação", Emoji = "📰", Tipo = "destruir_imagem", Meta = 10, PrecisaAlvo = true,
+                Dica = "Derrube a CREDIBILIDADE do alvo até esse patamar. Difamação e escândalo são seus amigos." },
+        new() { Id = "depor",      Titulo = "Golpe de Estado",    Emoji = "🚨", Tipo = "depor",        Meta = 1, PrecisaAlvo = true,
+                Dica = "Faça o alvo ser deposto: derrube a satisfação dele a -50% ou zere a população." },
+        new() { Id = "semdivida",  Titulo = "Nação Soberana",     Emoji = "📈", Tipo = "semdivida",    Meta = 0,
+                Dica = "Zere sua dívida (passe-a adiante numa negociação) e mantenha 2000 de caixa." },
+    };
+
+    private static void SortearMissoes(Room room)
+    {
+        var jogadores = room.Players.Where(p => p.ChoseCountry).ToList();
+        var baralho = Missoes.OrderBy(_ => _rng.Next()).ToList();
+
+        for (int i = 0; i < jogadores.Count; i++)
+        {
+            var def = baralho[i % baralho.Count];
+            var m = new Mission { DefId = def.Id, Meta = def.Meta };
+
+            if (def.PrecisaAlvo)
+            {
+                var possiveis = jogadores.Where(x => x.Id != jogadores[i].Id).ToList();
+                // sem adversário não dá para ter missão contra alguém: cai numa de acúmulo
+                if (possiveis.Count == 0)
+                {
+                    var alt = Missoes.First(d => !d.PrecisaAlvo);
+                    m = new Mission { DefId = alt.Id, Meta = alt.Meta };
+                }
+                else m.TargetId = possiveis[_rng.Next(possiveis.Count)].Id;
+            }
+            jogadores[i].Missao = m;
+        }
+    }
+
+    /// <summary>Progresso atual da missão: (quanto está, quanto precisa, cumpriu?).</summary>
+    private static (int atual, int meta, bool ok) ProgressoMissao(Room room, Player p)
+    {
+        var m = p.Missao;
+        if (m == null) return (0, 0, false);
+        var def = Missoes.FirstOrDefault(d => d.Id == m.DefId);
+        if (def == null) return (0, 0, false);
+
+        var alvo = m.TargetId != null ? room.Players.FirstOrDefault(x => x.Id == m.TargetId) : null;
+        int atual = def.Tipo switch
+        {
+            "dinheiro"        => p.Cofre.Dinheiro,
+            "patrimonio"      => p.Cofre.Valor,
+            "satisfacao"      => p.Stats.Satisfacao,
+            "credibilidade"   => p.Stats.Credibilidade,
+            "populacao"       => p.Stats.Populacao,
+            "militares"       => p.Cofre.Militares,
+            "petroleo"        => p.Cofre.Petroleo,
+            "destruir_imagem" => alvo?.Stats.Credibilidade ?? 100,
+            "depor"           => (alvo?.Deposto ?? false) ? 1 : 0,
+            "semdivida"       => p.Cofre.Divida <= 0 && p.Cofre.Dinheiro >= 2000 ? 1 : 0,
+            _ => 0
+        };
+
+        // nas missões de destruir imagem, cumprir é ficar ABAIXO da meta
+        bool ok = def.Tipo == "destruir_imagem" ? atual <= m.Meta
+                : def.Tipo == "semdivida" ? atual == 1
+                : atual >= m.Meta;
+        return (atual, m.Meta, ok);
+    }
+
+    /// <summary>Checa as missões no fim da rodada. A primeira cumprida encerra a partida.</summary>
+    private static void AvaliaMissoes(Room room)
+    {
+        if (room.Acabou) return;
+
+        foreach (var p in room.Players.Where(x => x.ChoseCountry && !x.Deposto))
+        {
+            var (_, _, ok) = ProgressoMissao(room, p);
+            if (!ok) continue;
+
+            p.Missao!.Concluida = true;
+            p.Missao.RoundConcluida = room.Round;
+            room.WinnerId = p.Id;
+
+            var def = Missoes.First(d => d.Id == p.Missao.DefId);
+            room.Events.Add(new GameEvent
+            {
+                Round = room.Round, Phase = room.Phase, Kind = "vitoria", Public = true,
+                ActorId = p.Id,
+                Text = $"🏆 {LabelFor(room, p)} cumpriu a missão \"{def.Emoji} {def.Titulo}\" e VENCEU a partida!"
+            });
+            p.LastResults.Add($"🏆 MISSÃO CUMPRIDA — você venceu!");
+            break;   // primeira missão cumprida encerra o jogo
+        }
+    }
+
     // ----------------------------------------------------------------- aplicações financeiras
     // Risco x retorno: quanto mais rende, maior a chance de quebrar. A credibilidade e a
     // satisfação do país ajustam a taxa — quem tem nome bom capta melhor.
@@ -376,6 +484,7 @@ public class GameService
             room.Round = 1;
             room.Proposals.Clear();
             room.Events.Clear();
+            SortearMissoes(room);          // cada um recebe seu objetivo secreto
             EnterPhase(room, GamePhase.Negociacao);
             startedToken = room.PhaseToken;
         }
@@ -489,6 +598,8 @@ public class GameService
     /// <summary>Decide e aplica a próxima fase (fecha a rodada depois de Resultados). Chamar sob lock.</summary>
     private static void AdvanceLocked(Room room)
     {
+        if (room.Acabou) return;   // partida encerrada: ninguém avança mais
+
         if (room.Phase == GamePhase.Resultados)
         {
             room.Round++;
@@ -537,6 +648,7 @@ public class GameService
             TimeSpan wait;
             lock (room.Sync)
             {
+                if (room.Acabou) return;                               // alguém venceu: cronômetro para
                 if (room.PhaseToken != token) return;                  // outra via já avançou
                 if (room.PhaseDeadlineUtc is not DateTime dl) return;
                 wait = dl - DateTime.UtcNow;
@@ -1164,6 +1276,9 @@ public class GameService
                 p.LastResults.Add($"⚠️ Povo revoltado ({p.Stats.Satisfacao}%): abaixo de {SatisfacaoGolpe}% o líder cai.");
             }
         }
+
+        // 5) missões: a primeira cumprida encerra a partida
+        AvaliaMissoes(room);
     }
 
     private static string LabelFor(Room room, Player p)
@@ -1384,6 +1499,13 @@ public class GameService
                         ? new DateTimeOffset(room.PhaseDeadlineUtc.Value).ToUnixTimeMilliseconds()
                         : (long?)null,
                     meReady = viewer.Ready,
+                    // fim de jogo
+                    acabou = room.Acabou,
+                    vencedorId = room.WinnerId,
+                    vencedorLabel = room.WinnerId != null ? Label(room, room.WinnerId) : null,
+                    euVenci = room.WinnerId == viewer.Id,
+                    // missão: SÓ o dono vê a dele
+                    missao = MissaoDto(room, viewer),
                     // barra de impostos + o que o servidor calcularia com a taxa atual
                     taxaImposto = viewer.TaxaImposto,
                     impostoPrevisto = ImpostoDe(viewer),
@@ -1512,6 +1634,31 @@ public class GameService
         dinheiro = c.Dinheiro, terra = c.Terra, petroleo = c.Petroleo,
         alimento = c.Alimento, militares = c.Militares, divida = c.Divida
     };
+
+    private static object? MissaoDto(Room room, Player p)
+    {
+        if (p.Missao == null) return null;
+        var def = Missoes.FirstOrDefault(d => d.Id == p.Missao.DefId);
+        if (def == null) return null;
+        var (atual, meta, ok) = ProgressoMissao(room, p);
+        var alvo = p.Missao.TargetId != null ? room.Players.FirstOrDefault(x => x.Id == p.Missao.TargetId) : null;
+
+        return new
+        {
+            titulo = def.Titulo,
+            emoji = def.Emoji,
+            tipo = def.Tipo,
+            dica = def.Dica,
+            meta,
+            atual,
+            concluida = p.Missao.Concluida || ok,
+            alvoLabel = alvo != null ? LabelFor(room, alvo) : null,
+            // barra de progresso (nas de destruir imagem o progresso é inverso)
+            pct = def.Tipo == "destruir_imagem"
+                ? (atual <= meta ? 100 : Math.Clamp((100 - atual) * 100 / Math.Max(1, 100 - meta), 0, 99))
+                : Math.Clamp(meta <= 0 ? (ok ? 100 : 0) : atual * 100 / meta, 0, 100)
+        };
+    }
 
     private static object StatsDto(Stats s) => new
     {

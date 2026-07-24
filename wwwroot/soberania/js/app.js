@@ -140,6 +140,51 @@ setInterval(() => {
   el.classList.toggle("urgent", restam <= 10);
 }, 250);
 
+// ---------- missão (objetivo secreto: cumprir vence a partida) ----------
+$("missaoBtn").onclick = () => { if (lastState) abrirMissao(lastState); };
+$("miClose").onclick = () => hide($("missaoModal"));
+$("missaoModal").onclick = (e) => { if (e.target === $("missaoModal")) hide($("missaoModal")); };
+
+function abrirMissao(s) {
+  const m = s.missao;
+  const box = $("miCorpo");
+  if (!m) {
+    $("miTitulo").textContent = "Sua missão";
+    box.innerHTML = '<div class="empty-note">A missão é sorteada quando a partida começa.</div>';
+  } else {
+    $("miTitulo").textContent = `${m.emoji} ${m.titulo}`;
+    const alvo = m.alvoLabel ? `<div class="mi-alvo">🎯 Alvo: <b>${m.alvoLabel}</b></div>` : "";
+    const inverso = m.tipo === "destruir_imagem";
+    box.innerHTML = `
+      ${alvo}
+      <p class="muted">${m.dica}</p>
+      <div class="mi-nums">
+        <span>${inverso ? "Credibilidade do alvo" : "Progresso"}: <b>${m.atual}</b></span>
+        <span>${inverso ? "derrubar até" : "meta"}: <b>${m.meta}</b></span>
+      </div>
+      <div class="mi-prog-track"><div class="mi-prog-fill ${m.concluida ? "done" : ""}" style="width:${m.pct}%"></div></div>
+      ${m.concluida ? '<p class="ok"><b>✅ Missão cumprida — você venceu!</b></p>' : ""}`;
+  }
+  show($("missaoModal"));
+}
+
+function renderMissaoBtn(s) {
+  const m = s.missao;
+  const b = $("missaoBtn");
+  if (!m) { b.textContent = "🎯 Missão"; b.classList.remove("done"); return; }
+  b.textContent = m.concluida ? "🏆 Cumprida" : `🎯 Missão ${m.pct}%`;
+  b.classList.toggle("done", !!m.concluida);
+}
+
+function renderVitoria(s) {
+  const v = $("vitoriaBanner");
+  if (!s.acabou) { hide(v); return; }
+  v.innerHTML = s.euVenci
+    ? `<div class="vt">🏆 VOCÊ VENCEU!</div><div class="vs">Missão cumprida na rodada ${s.round}.</div>`
+    : `<div class="vt">Fim de jogo</div><div class="vs">${s.vencedorLabel} cumpriu a missão e venceu a partida.</div>`;
+  show(v);
+}
+
 // ---------- render do estado ----------
 conn.on("state", (s) => applyState(s));
 
@@ -265,9 +310,12 @@ function renderGame(s) {
     nat.appendChild(div);
   }
 
+  renderMissaoBtn(s);
+  renderVitoria(s);
+
   // cronômetro + prontidão (substitui o antigo controle do host)
-  phaseDeadline = s.phaseDeadline || null;
-  const euAtivo = mine && mine.chose && !mine.deposto;
+  phaseDeadline = s.acabou ? null : (s.phaseDeadline || null);
+  const euAtivo = mine && mine.chose && !mine.deposto && !s.acabou;
   if (euAtivo) {
     show($("readyBar"));
     $("readyBtn").textContent = s.meReady ? "⏳ Aguardando os outros (clique p/ cancelar)" : "✅ Estou pronto";
