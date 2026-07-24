@@ -69,6 +69,25 @@ public class Cofre
         Divida    = Divida    * pct / 100,
     };
 
+    /// <summary>
+    /// Tabela de equivalência: quanto vale 1 unidade de cada recurso, em "g" (a moeda do jogo).
+    /// Base do Igor: 1 soldado = 1g e 1 petróleo = 2g (o dobro do soldado). Os demais seguem a
+    /// mesma proporção, escalados para o tamanho da economia. Dívida vale NEGATIVO: passar dívida
+    /// adiante tira valor de quem recebe.
+    /// </summary>
+    public const int ValorDinheiro  = 1;
+    public const int ValorMilitares = 10;
+    public const int ValorPetroleo  = 20;   // = 2 soldados
+    public const int ValorAlimento  = 8;
+    public const int ValorTerra     = 25;
+    public const int ValorDivida    = -5;
+
+    /// <summary>Converte o pacote inteiro para um valor único em g — é o que permite comparar maçã com laranja.</summary>
+    public int Valor =>
+        Dinheiro  * ValorDinheiro  + Militares * ValorMilitares +
+        Petroleo  * ValorPetroleo  + Alimento  * ValorAlimento  +
+        Terra     * ValorTerra     + Divida    * ValorDivida;
+
     /// <summary>Todo recurso de A é &gt;= ao de B (usado nas regras do NPC).</summary>
     public bool CobreOuIgual(Cofre b) =>
         Dinheiro >= b.Dinheiro && Terra >= b.Terra && Petroleo >= b.Petroleo &&
@@ -178,8 +197,11 @@ public class Npc
     public string Id { get; set; } = "";     // referenciado como "npc:<id>"
     public string Name { get; set; } = "";
     public string Emoji { get; set; } = "";
-    public Cofre Da { get; set; } = new();    // o que o NPC entrega
-    public Cofre Quer { get; set; } = new();  // o que o NPC exige em troca
+    public Cofre Da { get; set; } = new();     // o que o NPC vende (a única coisa que ele expõe)
+    public int MarkupPct { get; set; } = 125;  // ele cobra acima do valor de tabela — é o lucro dele
+
+    /// <summary>Preço em g. O jogador paga com QUALQUER mistura de recursos que some esse valor.</summary>
+    public int Preco => Da.Valor * MarkupPct / 100;
 }
 
 public enum ProposalStatus { Pendente, Aceita, Recusada }
@@ -284,6 +306,8 @@ public class Player
     public bool Deposto { get; set; }   // golpe: satisfação chegou a zero
     public bool Ready { get; set; }     // marcou "pronto" na fase atual (zera a cada fase)
     public int TaxaImposto { get; set; } = 50;   // 0..100 — quanto você espreme a população
+    public int PazInternaRounds { get; set; }    // rodadas de imunidade após uma guerra civil
+    public int AtaquesNaFase { get; set; }       // 1 ataque militar por fase (zera a cada fase)
 
     // histórico por rodada, para os gráficos da tela de Resultados
     public List<Snapshot> History { get; } = new();

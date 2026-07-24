@@ -160,6 +160,8 @@ input:focus { outline: none; border-color: var(--accent); }
 .tb-head { font-size: 15px; margin-bottom: 8px; }
 .tb-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .tb-label { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+.valor-tag { font-weight: 400; color: var(--muted); font-size: 11px; }
+.valor-tag b { color: var(--txt); }
 .tb-label.give { color: var(--accent2); }
 .tb-label.get { color: var(--ok); }
 .res-inputs { display: flex; flex-direction: column; gap: 6px; }

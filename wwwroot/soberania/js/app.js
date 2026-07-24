@@ -849,15 +849,31 @@ function buildResInputs() {
   const mk = (prefix) => RES.map((r) =>
     `<div class="res-in">
        <label>${r.emoji} ${r.label}</label>
-       <input id="${prefix}_${r.key}" type="number" min="0" value="0" inputmode="numeric" />
+       <input id="${prefix}_${r.key}" type="number" min="0" value="0" inputmode="numeric" data-vprefix="${prefix}" />
      </div>`).join("");
   $("offerInputs").innerHTML = mk("off");
   $("requestInputs").innerHTML = mk("req");
+  // toda digitação recalcula os dois valores totais
+  for (const inp of document.querySelectorAll('#offerInputs input, #requestInputs input'))
+    inp.oninput = atualizaValores;
   resInputsBuilt = true;
+}
+
+// tabela de equivalência vinda do servidor: soma o valor em g de um lado da proposta
+function valorEmG(prefix) {
+  const t = (lastState && lastState.tabelaValores) || {};
+  let total = 0;
+  for (const r of RES) total += (parseInt($(`${prefix}_${r.key}`).value, 10) || 0) * (t[r.key] || 0);
+  return total;
+}
+function atualizaValores() {
+  $("offerValor").textContent = valorEmG("off");
+  $("reqValor").textContent = valorEmG("req");
 }
 
 function setRes(prefix, cofre) {
   for (const r of RES) $(`${prefix}_${r.key}`).value = cofre ? (cofre[r.key] || 0) : 0;
+  atualizaValores();
 }
 function readRes(prefix) {
   const out = {};
@@ -880,7 +896,7 @@ function renderNeg(s) {
   for (const n of s.npcs) {
     let hint;
     if (n.bloqueado) hint = `💣 sabotada — não vende por ${n.bloqueioRounds} rodada(s)`;
-    else hint = `dá ${resSummary(n.da)} · quer ${resSummary(n.quer)}`
+    else hint = `vende ${resSummary(n.da)} por ${n.preco}g`
               + (n.temAgio ? ` ⚠️ inflado por ${n.restritaDono}` : "")
               + (n.souDonoRestrita ? " 🔒 sua Relação Restrita" : "");
     targets.appendChild(targetCard(n.id, true, n.emoji, n.name, hint, n));
@@ -959,10 +975,10 @@ function selectTarget(id, isNpc, label, npc) {
   $("tbTarget").textContent = label;
   show($("tradeBuilder"));
   hide($("negMsg"));
-  // NPC: pré-preenche com o negócio fixo dele (ofereço o que ele quer, peço o que ele dá)
+  // NPC: só peço o que ele vende; pago o preço em g (pré-preenchido em dinheiro)
   if (isNpc && npc) {
-    setRes("off", npc.quer); setRes("req", npc.da);
-    let hint = `A ${npc.name} só fecha se você oferecer pelo menos o que ela pede. Pré-preenchi o negócio dela.`;
+    setRes("off", { dinheiro: npc.preco }); setRes("req", npc.da);
+    let hint = `A ${npc.name} vende ${resSummary(npc.da)} por ${npc.preco}g. Pague com qualquer mistura de recursos que some esse valor.`;
     if (npc.bloqueado) hint = `💣 ${npc.name} foi sabotada e não vende por ${npc.bloqueioRounds} rodada(s).`;
     else if (npc.temAgio) hint += ` ⚠️ O preço está inflado porque ${npc.restritaDono} tem Relação Restrita com ela.`;
     else if (npc.souDonoRestrita) hint += ` 🔒 Você tem a Relação Restrita: paga o preço normal e os outros pagam mais.`;

@@ -191,25 +191,26 @@ public class GameService
         return st;
     }
 
-    /// <summary>O que o NPC exige DESTE jogador (com ágio se outro dono detém a Relação Restrita).</summary>
-    private static Cofre QuerDe(Room room, Npc npc, string playerId)
+    /// <summary>Preço em g que ESTE jogador paga (inflado se outro dono detém a Relação Restrita).</summary>
+    private static int PrecoDe(Room room, Npc npc, string playerId)
     {
         var st = StateOf(room, npc.Id);
         return (st.RestritaOwnerId != null && st.RestritaOwnerId != playerId)
-            ? npc.Quer.Scale(RestritaMarkupPct)
-            : npc.Quer;
+            ? npc.Preco * RestritaMarkupPct / 100
+            : npc.Preco;
     }
 
     // ----------------------------------------------------------------- NPCs (oferta FIXA, igual em todo jogo)
     // Cada NPC entrega "Da" e exige "Quer". Aceita automaticamente se a proposta do jogador
     // oferecer pelo menos o que ele Quer e pedir no máximo o que ele Da.
     // Valores na mesma escala dos cofres — ajuste à vontade.
+    // Cada NPC só expõe o que VENDE; o preço sai da tabela de equivalência + o markup dele.
     private static readonly List<Npc> Npcs = new()
     {
-        new() { Id = "venezuela", Name = "Venezuela", Emoji = "🇻🇪", Da = new() { Petroleo = 40 }, Quer = new() { Dinheiro = 300 } },
-        new() { Id = "catar",     Name = "Catar",     Emoji = "🇶🇦", Da = new() { Dinheiro = 400 }, Quer = new() { Petroleo = 30 } },
-        new() { Id = "ucrania",   Name = "Ucrânia",   Emoji = "🇺🇦", Da = new() { Alimento = 60 }, Quer = new() { Dinheiro = 250 } },
-        new() { Id = "suica",     Name = "Suíça",     Emoji = "🇨🇭", Da = new() { Dinheiro = 600 }, Quer = new() { Terra = 40 } },
+        new() { Id = "venezuela", Name = "Venezuela", Emoji = "🇻🇪", Da = new() { Petroleo = 40 }, MarkupPct = 120 },
+        new() { Id = "catar",     Name = "Catar",     Emoji = "🇶🇦", Da = new() { Dinheiro = 600 }, MarkupPct = 115 },
+        new() { Id = "ucrania",   Name = "Ucrânia",   Emoji = "🇺🇦", Da = new() { Alimento = 80 }, MarkupPct = 120 },
+        new() { Id = "suica",     Name = "Suíça",     Emoji = "🇨🇭", Da = new() { Dinheiro = 900 }, MarkupPct = 110 },
     };
 
     // ----------------------------------------------------------------- criar sala
@@ -400,7 +401,7 @@ public class GameService
     private static void EnterPhase(Room room, GamePhase phase)
     {
         room.Phase = phase;
-        foreach (var p in room.Players) p.Ready = false;
+        foreach (var p in room.Players) { p.Ready = false; p.AtaquesNaFase = 0; }
         room.PhaseToken = Guid.NewGuid();
         room.PhaseDeadlineUtc = DateTime.UtcNow.AddSeconds(PhaseSeconds.TryGetValue(phase, out var s) ? s : 60);
 
@@ -732,6 +733,9 @@ public class GameService
             var phaseErr = CheckOffensivePhase(room, a.Id, t.Id, out _);
             if (phaseErr != null) return phaseErr;
             if (a.Cofre.Militares <= 0) return Fail("Sem militares para atacar.");
+            // um ataque por fase: sem isso dá para invadir em Ações e de novo em Represálias
+            if (a.AtaquesNaFase >= 1) return Fail("Você já atacou nesta fase.");
+            a.AtaquesNaFase++;
 
             int pa = a.Cofre.Militares, pd = t.Cofre.Militares;
             int baixasT = Math.Min(pd, (int)Math.Ceiling(pa * AtkCasualtyRate));
@@ -743,7 +747,10 @@ public class GameService
             string extra;
             if (vantagem > 0)
             {
-                int perdaPop = vantagem * 2;
+                // percentual (com teto), não absoluto: um país grande sofre mais em número,
+                // mas ninguém é apagado do mapa por uma invasão só.
+                int pctPop = Math.Clamp(vantagem / 2, 1, InvasaoPopTetoPct);
+                int perdaPop = Perda(t.Stats.Populacao, pctPop);
                 t.Stats.Populacao = Math.Max(0, t.Stats.Populacao - perdaPop);
                 t.Stats.Satisfacao -= 5; t.Stats.Clamp();
                 int saque = vantagem / 2;
@@ -751,7 +758,7 @@ public class GameService
                 int alim = Math.Min(saque, Math.Max(0, t.Cofre.Alimento));
                 t.Cofre.Petroleo -= petro; a.Cofre.Petroleo += petro;
                 t.Cofre.Alimento -= alim; a.Cofre.Alimento += alim;
-                extra = $" Invasão! Alvo perdeu {perdaPop}mi de população; saque de {petro}🛢️ e {alim}🌾.";
+                extra = $" Invasão! Alvo perdeu {perdaPop}mi de população ({pctPop}%); saque de {petro}🛢️ e {alim}🌾.";
             }
             else
             {
@@ -884,6 +891,11 @@ public class GameService
     private const int CredRiscoGuerraCivil = 30;     // abaixo disso começa o risco; em 0 é certeza
     private const int MilitarSeguro = 30;            // militares abaixo disso agravam o risco
     private const int MilitarAgravanteMax = 40;      // quanto o militar fraco soma na chance
+    private const int GuerraCivilSatisf = 12;        // quanto de satisfação ela custa (era 25: virava poço sem fundo)
+    private const int GuerraCivilCred = 5;           // quanto de credibilidade ela custa (era 10)
+    private const int GuerraCivilCooldown = 2;       // rodadas de paz forçada depois de uma guerra civil
+
+    private const int InvasaoPopTetoPct = 20;        // teto de população perdida numa invasão
 
     /// <summary>Quem tem relação comercial ATIVA com este jogador.</summary>
     private static IEnumerable<Player> ParceirosComerciais(Room room, string playerId) =>
@@ -1069,10 +1081,17 @@ public class GameService
         }
 
         // 3c) GUERRA CIVIL: credibilidade baixa é o gatilho; militar fraco agrava.
-        // Credibilidade 0 = 100% de chance.
+        // Credibilidade 0 = 100% de chance. Depois de uma, o país ganha rodadas de paz forçada
+        // para poder se reerguer — sem isso vira poço sem fundo (a guerra civil alimenta a próxima).
         foreach (var p in ativos.ToList())
         {
             var s = p.Stats;
+            if (p.PazInternaRounds > 0)
+            {
+                p.PazInternaRounds--;
+                p.LastResults.Add($"🕊️ Trégua interna: o país se recompõe da guerra civil ({p.PazInternaRounds} rodada(s) de paz).");
+                continue;
+            }
             if (s.Credibilidade >= CredRiscoGuerraCivil) continue;
 
             int chance = (CredRiscoGuerraCivil - s.Credibilidade) * 100 / CredRiscoGuerraCivil;
@@ -1091,11 +1110,12 @@ public class GameService
             int perdaPop = Perda(s.Populacao, 10);
             p.Cofre.Militares -= perdaMil;
             s.Populacao -= perdaPop;
-            s.Satisfacao -= 25;
-            AjustaCredibilidade(room, p, -10);
+            s.Satisfacao -= GuerraCivilSatisf;
+            AjustaCredibilidade(room, p, -GuerraCivilCred);
+            p.PazInternaRounds = GuerraCivilCooldown;
             s.Clamp();
 
-            p.LastResults.Add($"🔥 GUERRA CIVIL! (chance era {chance}%) -{perdaMil}🪖, -{perdaPop}mi de população, -25 satisfação.");
+            p.LastResults.Add($"🔥 GUERRA CIVIL! (chance era {chance}%) -{perdaMil}🪖, -{perdaPop}mi de população, -{GuerraCivilSatisf} satisfação. (Trégua pelas próximas {GuerraCivilCooldown} rodadas.)");
             room.Events.Add(new GameEvent
             {
                 Round = room.Round, Phase = room.Phase, Kind = "desastre", Public = true,
@@ -1116,7 +1136,19 @@ public class GameService
                 Populacao = p.Stats.Populacao,
                 Satisfacao = p.Stats.Satisfacao
             });
-            if (p.Stats.Satisfacao <= SatisfacaoGolpe)
+            // país sem povo deixa de existir (antes virava um zumbi imortal sem arrecadação)
+            if (p.Stats.Populacao <= 0)
+            {
+                p.Deposto = true;
+                p.LastResults.Add("💀 COLAPSO! O país ficou sem população e deixou de existir.");
+                room.Events.Add(new GameEvent
+                {
+                    Round = room.Round, Phase = room.Phase, Kind = "desastre", Public = true,
+                    ActorId = "", TargetId = p.Id,
+                    Text = $"💀 {LabelFor(room, p)} entrou em colapso: sem povo, o país saiu do mapa."
+                });
+            }
+            else if (p.Stats.Satisfacao <= SatisfacaoGolpe)
             {
                 p.Deposto = true;
                 p.LastResults.Add($"🚨 GOLPE! Satisfação em {p.Stats.Satisfacao}% — a população derrubou o líder.");
@@ -1171,10 +1203,10 @@ public class GameService
                 };
 
                 var estado = StateOf(room, npc.Id);
-                var querDele = QuerDe(room, npc, connectionId);   // já com ágio da Relação Restrita, se houver
+                int preco = PrecoDe(room, npc, connectionId);     // já com ágio da Relação Restrita, se houver
 
-                // NPC aceita se recebe pelo menos o que pede E o pedido cabe no que ele dá
-                bool ofereceOSuficiente = off.CobreOuIgual(querDele);
+                // Agora vale QUALQUER mistura de recursos: o que conta é o valor total em g.
+                bool pagouOPreco = off.Valor >= preco;
                 bool pedidoCabe = npc.Da.CobreOuIgual(req);
 
                 if (estado.Bloqueado)
@@ -1182,7 +1214,7 @@ public class GameService
                     prop.Status = ProposalStatus.Recusada;
                     prop.Note = $"{npc.Name} está sabotada e não vende nada por {estado.BloqueioRoundsLeft} rodada(s).";
                 }
-                else if (ofereceOSuficiente && pedidoCabe)
+                else if (pagouOPreco && pedidoCabe)
                 {
                     // acerta na hora (NPC tem estoque infinito; só mexe no cofre do jogador). Permite negativo.
                     from.Cofre.Apply(off, -1);
@@ -1195,7 +1227,9 @@ public class GameService
                     var agio = estado.RestritaOwnerId != null && estado.RestritaOwnerId != connectionId
                         ? " (preço inflado por uma Relação Restrita de outro país)" : "";
                     prop.Status = ProposalStatus.Recusada;
-                    prop.Note = $"{npc.Name} só troca {Descrever(npc.Da)} por {Descrever(querDele)}{agio}.";
+                    prop.Note = !pedidoCabe
+                        ? $"{npc.Name} só vende {Descrever(npc.Da)}."
+                        : $"{npc.Name} pede {preco}g e você ofereceu só {off.Valor}g{agio}.";
                 }
 
                 room.Proposals.Add(prop);
@@ -1338,6 +1372,13 @@ public class GameService
                     hostId = room.HostConnectionId,
                     minPlayers = MinPlayers,
                     meId = viewer.Id,
+                    // tabela de equivalência: quanto cada recurso vale em g (o front soma o "valor total")
+                    tabelaValores = new
+                    {
+                        dinheiro = Cofre.ValorDinheiro, militares = Cofre.ValorMilitares,
+                        petroleo = Cofre.ValorPetroleo, alimento = Cofre.ValorAlimento,
+                        terra = Cofre.ValorTerra, divida = Cofre.ValorDivida
+                    },
                     // cronômetro da fase (epoch ms) e prontidão
                     phaseDeadline = room.PhaseDeadlineUtc.HasValue
                         ? new DateTimeOffset(room.PhaseDeadlineUtc.Value).ToUnixTimeMilliseconds()
@@ -1418,15 +1459,14 @@ public class GameService
                     npcs = Npcs.Select(n =>
                     {
                         var st = StateOf(room, n.Id);
-                        var querParaMim = QuerDe(room, n, viewer.Id);
                         return new
                         {
                             id = "npc:" + n.Id,
                             name = n.Name,
                             emoji = n.Emoji,
-                            da = CofreDto(n.Da),
-                            quer = CofreDto(querParaMim),          // já com ágio, se for o caso
-                            querBase = CofreDto(n.Quer),
+                            da = CofreDto(n.Da),               // só o que ele VENDE fica exposto
+                            preco = PrecoDe(room, n, viewer.Id), // preço em g (com ágio, se houver)
+                            precoBase = n.Preco,
                             bloqueado = st.Bloqueado,
                             bloqueioRounds = st.BloqueioRoundsLeft,
                             souDonoRestrita = st.RestritaOwnerId == viewer.Id,

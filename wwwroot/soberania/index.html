@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Soberania</title>
-<link rel="stylesheet" href="css/style.css?v=13" />
+<link rel="stylesheet" href="css/style.css?v=14" />
 </head>
 <body>
   <header class="topbar">
@@ -84,11 +84,11 @@
           <p id="tbNpcHint" class="tiny muted" hidden></p>
           <div class="tb-cols">
             <div>
-              <div class="tb-label give">Você oferece</div>
+              <div class="tb-label give">Você oferece <span class="valor-tag">= <b id="offerValor">0</b>g</span></div>
               <div id="offerInputs" class="res-inputs"></div>
             </div>
             <div>
-              <div class="tb-label get">Você quer receber</div>
+              <div class="tb-label get">Você quer receber <span class="valor-tag">= <b id="reqValor">0</b>g</span></div>
               <div id="requestInputs" class="res-inputs"></div>
             </div>
           </div>
@@ -263,6 +263,6 @@
   <footer class="foot tiny" id="foot"></footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
-  <script src="js/app.js?v=13"></script>
+  <script src="js/app.js?v=14"></script>
 </body>
 </html>
